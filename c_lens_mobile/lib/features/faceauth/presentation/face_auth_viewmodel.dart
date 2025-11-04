@@ -15,10 +15,10 @@ import 'package:c_lens_mobile/features/faceauth/domain/face_embedding.dart';
 
 class Face_auth_viewModel extends ChangeNotifier {
   final Face_embedding_extractor extractor = Face_embedding_extractor();
-  FaceEmbedding? embedding;
+  Face_embedding? embedding;
 
   void onImageCaptured(File file) {
-    final processed = ImagePreprocessor.preprocess(file);
+    final processed = Image_preprocessor.preprocess(file);
     embedding = extractor.run(processed);
     notifyListeners();
   }

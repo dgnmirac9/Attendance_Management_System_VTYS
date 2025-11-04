@@ -18,7 +18,7 @@ class Face_embedding_extractor {
   late Interpreter _interpreter;
   bool _isReady = false;
 
-  FaceEmbeddingExtractor() {
+  Face_embedding_extractor() {
     _init();
   }
 
@@ -35,7 +35,7 @@ class Face_embedding_extractor {
   bool get isReady => _isReady;
 
   /// Image → Embedding
-  FaceEmbedding run(img.Image image) {
+  Face_embedding run(img.Image image) {
     if (!_isReady) {
       throw Exception("FaceEmbeddingExtractor: Model henüz yüklenmedi!");
     }
@@ -58,6 +58,6 @@ class Face_embedding_extractor {
     final output = List.filled(128, 0.0).reshape([1, 128]);
     _interpreter.run(input, output);
 
-    return FaceEmbedding(output[0].cast<double>());
+    return Face_embedding(output[0].cast<double>());
   }
 }
