@@ -309,6 +309,7 @@ class _RegisterFormState extends State<RegisterForm> {
                                     _faceImages = result;
                                     _faceDataAdded = _faceImages.length >= 3;
                                   });
+                                  if (!context.mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text('$_faceImagesCountStr yakalandı.')),
                                   );
