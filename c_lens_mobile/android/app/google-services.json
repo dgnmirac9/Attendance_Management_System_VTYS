@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "736613391156",
+    "project_id": "c-lens-mobile",
+    "storage_bucket": "c-lens-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:736613391156:android:b4b5c0c1c14efff0f7e361",
+        "android_client_info": {
+          "package_name": "com.example.c_lens_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSxxd-VVWw8f_coiH3GY3W45xe7n8JHI4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
