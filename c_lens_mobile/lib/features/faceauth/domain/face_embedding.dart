@@ -29,15 +29,15 @@ import 'dart:math' show sqrt;
  */
 
 
-class Face_embedding {
+class FaceEmbedding {
   /// Her zaman sabit uzunlukta (128 eleman) embedding listesi
   final List<double> values;
 
-  const Face_embedding(this.values)
+  const FaceEmbedding(this.values)
       : assert(values.length == 128, 'Embedding 128 uzunlukta olmalı.');
 
   /// Cosine similarity hesaplaması
-  double similarity(Face_embedding other) {
+  double similarity(FaceEmbedding other) {
     final a = values;
     final b = other.values;
 
@@ -59,7 +59,7 @@ class Face_embedding {
 
   /// İki embedding eşleşiyor mu?
   /// threshold → kullanım senaryosuna göre değişebilir (0.65 - 0.85 arası)
-  bool matches(Face_embedding other, {double threshold = 0.75}) {
+  bool matches(FaceEmbedding other, {double threshold = 0.75}) {
     return similarity(other) >= threshold;
   }
 }
