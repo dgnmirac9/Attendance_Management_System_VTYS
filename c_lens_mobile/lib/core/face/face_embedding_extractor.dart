@@ -14,11 +14,12 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 import '../../features/faceauth/domain/face_embedding.dart';
 
-class Face_embedding_extractor {
+// Sınıf ismi düzeltildi (PascalCase)
+class FaceEmbeddingExtractor {
   late Interpreter _interpreter;
   bool _isReady = false;
 
-  Face_embedding_extractor() {
+  FaceEmbeddingExtractor() {
     _init();
   }
 
@@ -35,7 +36,7 @@ class Face_embedding_extractor {
   bool get isReady => _isReady;
 
   /// Image → Embedding
-  Face_embedding run(img.Image image) {
+  FaceEmbedding run(img.Image image) {
     if (!_isReady) {
       throw Exception("FaceEmbeddingExtractor: Model henüz yüklenmedi!");
     }
@@ -43,9 +44,12 @@ class Face_embedding_extractor {
     final input = List.generate(112, (y) =>
         List.generate(112, (x) {
           final p = image.getPixel(x, y);
-          final r = img.getRed(p);
-          final g = img.getGreen(p);
-          final b = img.getBlue(p);
+          
+          // DÜZELTME BURADA YAPILDI:
+          // image paketi v4'te getRed/getGreen yerine p.r/p.g kullanılır.
+          final r = p.r;
+          final g = p.g;
+          final b = p.b;
 
           return [
             (r - 127.5) / 128.0,
@@ -58,6 +62,6 @@ class Face_embedding_extractor {
     final output = List.filled(128, 0.0).reshape([1, 128]);
     _interpreter.run(input, output);
 
-    return Face_embedding(output[0].cast<double>());
+    return FaceEmbedding(output[0].cast<double>());
   }
 }

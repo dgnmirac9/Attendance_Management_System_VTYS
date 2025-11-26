@@ -13,12 +13,12 @@ import '../../../core/face/image_preprocessor.dart';
 import '../../../core/face/face_embedding_extractor.dart';
 import 'package:c_lens_mobile/features/faceauth/domain/face_embedding.dart';
 
-class Face_auth_viewModel extends ChangeNotifier {
-  final Face_embedding_extractor extractor = Face_embedding_extractor();
-  Face_embedding? embedding;
+class FaceAuthViewModel extends ChangeNotifier {
+  final FaceEmbeddingExtractor extractor = FaceEmbeddingExtractor();
+  FaceEmbedding? embedding;
 
   void onImageCaptured(File file) {
-    final processed = Image_preprocessor.preprocess(file);
+    final processed = ImagePreprocessor.preprocess(file);
     embedding = extractor.run(processed);
     notifyListeners();
   }
