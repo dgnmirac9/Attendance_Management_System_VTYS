@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"android":{"default":{"projectId":"c-lens-mobile","appId":"1:736613391156:android:b4b5c0c1c14efff0f7e361","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"c-lens-mobile","configurations":{"android":"1:736613391156:android:b4b5c0c1c14efff0f7e361","ios":"1:736613391156:ios:ef47195c76e436cdf7e361"}}}}}}

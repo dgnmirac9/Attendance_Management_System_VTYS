@@ -8,8 +8,21 @@ import 'shared/themes/app_theme.dart';
 
 // Rota yönlendirme dosyan
 import 'routes.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'firestore_test_service.dart';
 
-void main() {
+
+Future<void> main() async {
+  // Flutter binding'i hazırlıyoruz (Firebase gibi async şeyler için şart)
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Uygulama açılırken Firebase'i projeye bağla
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await FirestoreTestService().writeAndReadTest();
+
   runApp(const MyApp());
 }
 
