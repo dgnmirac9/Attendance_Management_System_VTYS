@@ -1,0 +1,36 @@
+# --- IDE ve Editör Ayarları (Sizin ekledikleriniz) ---
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+/shelf/
+/workspace.xml
+
+# --- Flutter ve Dart Temel Dosyaları (ÇOK ÖNEMLİ) ---
+/build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# --- Android Tarafı ---
+/android/.gradle/
+/android/local.properties
+/android/app/build/
+/android/.idea/
+/android/key.properties
+*.jks
+*.keystore
+
+# --- iOS Tarafı ---
+/ios/.symlinks/
+/ios/Pods/
+/ios/Podfile.lock
+/ios/DerivedData/
+.DS_Store
+
+# --- Hata Logları ---
+*.log
