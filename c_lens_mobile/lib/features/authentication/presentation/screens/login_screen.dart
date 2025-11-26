@@ -1,30 +1,18 @@
 import 'package:flutter/material.dart';
+import '../widgets/register_form.dart';
 
-// 1. Yeni widget'ımızı buraya import ediyoruz
-import '../widgets/login_form.dart'; 
-
-class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatelessWidget {
+  const RegisterScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blue.shade50,
+      // backgroundColor: ... (SİLDİK - Temadan geliyor)
       appBar: AppBar(
-        title: const Text(
-          'C-Lens',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.blue.shade700,
-        elevation: 0,
+        title: Text('Kayıt Ol')
+        // centerTitle, elevation, color... (HEPSİNİ SİLDİK)
       ),
-      // 2. 'Center' widget'ını silip yerine 'LoginForm'u koyuyoruz.
-      body: const LoginForm(),
+      body: const RegisterForm(),
     );
   }
 }

@@ -26,6 +26,12 @@ dependencies:
   sliding_switch: ^1.1.0
   # Dosya yolları (resim kaydetme vb.)
   path_provider: ^2.1.2
+  firebase_core: ^4.2.1
+  cloud_firestore: ^6.1.0
+  qr_flutter: ^4.1.0
+  shared_preferences: ^2.5.3
+  mobile_scanner: 5.2.3
+  firebase_auth: ^6.1.2
 
 #  cupertino_icons: ^1.0.8
 #  toggle_switch: ^2.3.0

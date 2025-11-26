@@ -15,7 +15,7 @@
 import 'dart:io';
 import 'package:image/image.dart' as img;
 
-class Image_preprocessor {
+class ImagePreprocessor {
   static img.Image preprocess(File file) {
     final data = file.readAsBytesSync();
     img.Image image = img.decodeImage(data)!;
