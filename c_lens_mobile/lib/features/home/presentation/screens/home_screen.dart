@@ -1,574 +1,254 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../routes.dart' as app_routes;
 
-class HomeScreen extends StatelessWidget {
-  final String userRole; // 'teacher' veya 'student'
-  
-  const HomeScreen({super.key, this.userRole = 'student'});
+// Kendi oluşturduğumuz widget ve servisleri çağırıyoruz
+import '../widgets/home_empty_state.dart';
+import '../widgets/profile_menu_sheet.dart';
+import '../widgets/create_class_dialog.dart'; 
+import '../widgets/join_class_dialog.dart';
+import '../../../authentication/data/auth_service.dart';
 
-  void _handleLogout(BuildContext context) {
-    Navigator.pushReplacementNamed(context, app_routes.Routes.login);
-  }
+class HomeScreen extends StatelessWidget {
+  final String userRole;
+  // Hata Fix 1: '_authService' tanımlanırken 'const' keyword'ü kaldırıldı.
+  final AuthService _authService = AuthService(); 
+
+  // FIX: Constructor'da 'const' keyword'ü kaldırıldı.
+  HomeScreen({super.key, this.userRole = 'student'});
 
   bool get isTeacher => userRole == 'teacher';
-  bool get isStudent => userRole == 'student';
 
   @override
   Widget build(BuildContext context) {
-    // Şimdilik boş sınıf listesi - veritabanı bağlantısı eklendiğinde doldurulacak
-    final List<Map<String, dynamic>> classes = [];
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          app_routes.Routes.login, (Route<dynamic> route) => false);
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
+    // FIX 2: Renk erişimi hatalarını gidermek için, sadece withOpacity'ı kaldırdık
+    // ve renkleri doğrudan kullandık.
+    // %10 Şeffaflıkta Arka Plan Rengi
+    final profileBgColor = primaryColor.withAlpha(255 ~/ 10);
+    // %50 Şeffaflıkta Çerçeve Rengi
+    final profileBorderColor = primaryColor.withAlpha(255 ~/ 2); 
+    
     return Scaffold(
-      backgroundColor: Colors.blue.shade50,
       appBar: AppBar(
-        title: Text(
-          'Sınıflarım',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w500,
-            color: Colors.blue.shade900,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.blue.shade700,
-        elevation: 0,
+        title: const Text('Sınıflarım'),
         actions: [
-          // Kullanıcı profil simgesi - giriş ekranındaki gibi
+          // --- PROFİL İKONU ---
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: IconButton(
-              icon: Container(
-                width: 40,
-                height: 40,
+            padding: const EdgeInsets.only(right: 16.0),
+            child: InkWell(
+              onTap: () => _showProfileMenu(context),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade100,
+                  color: profileBgColor, // FIX: Uyarı Giderildi
                   shape: BoxShape.circle,
+                  border: Border.all(color: profileBorderColor, width: 1), // FIX: Uyarı Giderildi
                 ),
-                child: Icon(
-                  Icons.face,
-                  size: 24,
-                  color: Colors.blue.shade600,
-                ),
+                child: Icon(Icons.face, color: primaryColor, size: 24),
               ),
-              onPressed: () {
-                // Kullanıcı profil menüsü
-              },
-              tooltip: 'Profil',
             ),
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.only(
-                left: 16.0,
-                right: 16.0,
-                top: 16.0,
-                bottom: 100.0, // Butonlar için alan bırak
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Sınıf kartları listesi
-                  if (classes.isEmpty)
-                    _buildEmptyState(context)
-                  else
-                    _buildClassesList(classes),
-                ],
-              ),
-            ),
-          ),
-          // Butonlar - Altta sabitlenmiş
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Card(
-                  elevation: 4,
-                  margin: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
+
+      // --- GÖVDE: CANLI VERİ DİNLEYİCİSİ (StreamBuilder) ---
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _authService.getClassesStream(currentUser.uid, userRole),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          if (snapshot.hasError) {
+            return Center(child: Text('Veri çekilirken hata oluştu: ${snapshot.error}'));
+          }
+
+          final classes = snapshot.data ?? [];
+
+          if (classes.isEmpty) {
+            return const HomeEmptyState();
+          }
+
+          return _buildClassesList(context, classes);
+        },
+      ),
+
+      // --- SAĞ ALT BUTON (FAB) ---
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          if (isTeacher) {
+            _showCreateClassDialog(context);
+          } else {
+            _showJoinClassDialog(context);
+          }
+        },
+        backgroundColor: primaryColor,
+        foregroundColor: theme.colorScheme.surface,
+        elevation: 4,
+        shape: const CircleBorder(), 
+        child: Icon(isTeacher ? Icons.add : Icons.group_add, size: 28),
+      ),
+    );
+  }
+
+  // --- SINIF LİSTESİ WIDGET'I (YENİ TASARIM) ---
+  Widget _buildClassesList(BuildContext context, List<Map<String, dynamic>> classes) {
+    final theme = Theme.of(context);
+    // Temanın ana rengini (primaryColor) kullanarak canlı bir vurgu rengi oluşturuyoruz
+    final accentColor = theme.colorScheme.primary; 
+    // Kartın arka plan rengini temaya uygun belirliyoruz (genellikle CardColor veya Surface)
+    final cardColor = theme.colorScheme.surface;
+    // Kartın gölgeli görünmesi için Container Elevation'u kullanıyoruz
+    const double cardElevation = 4;
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: ListView.builder(
+        itemCount: classes.length,
+        itemBuilder: (context, index) {
+          final classData = classes[index];
+          final studentCount = classData['studentUids']?.length ?? 0;
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: InkWell(
+              onTap: () {
+                // Sınıf detay sayfasına gitme logic'i buraya gelecek
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: cardElevation,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                  // Sol tarafta tema renginde kalın bir çizgi (vurgu)
+                  border: Border(
+                    left: BorderSide(
+                      color: accentColor, 
+                      width: 6,
                     ),
                   ),
-                  color: Colors.white,
-                  shadowColor: Colors.black.withValues(alpha: 0.25),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: isTeacher
-                        ? _buildTeacherButton(context)
-                        : _buildStudentButton(context),
-                  ),
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTeacherButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: () {
-          _showCreateClassDialog(context);
-        },
-        icon: const Icon(Icons.add_circle_outline, size: 24),
-        label: const Text(
-          'Sınıf Oluştur',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue.shade600,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStudentButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () {
-          _showJoinClassDialog(context);
-        },
-        icon: const Icon(Icons.group_add, size: 24),
-        label: const Text(
-          'Sınıfa Katıl',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.blue.shade600,
-          side: BorderSide(color: Colors.blue.shade600, width: 2),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(30),
-      ),
-      color: Colors.white,
-      shadowColor: Colors.black.withValues(alpha: 0.25),
-      child: Padding(
-        padding: const EdgeInsets.all(40.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Colors.blue.shade100,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.bookmark,
-                size: 60,
-                color: Colors.blue.shade600,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Henüz sınıfınız yok',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.blue.shade900,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Sınıf oluşturarak veya bir sınıfa katılarak başlayın',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.blue.shade700,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildClassesList(List<Map<String, dynamic>> classes) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.1,
-      ),
-      itemCount: classes.length,
-      itemBuilder: (context, index) {
-        final classData = classes[index];
-        return _buildClassCard(classData);
-      },
-    );
-  }
-
-  Widget _buildClassCard(Map<String, dynamic> classData) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(30),
-      ),
-      color: Colors.white,
-      shadowColor: Colors.black.withValues(alpha: 0.25),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: () {
-          // Sınıf detay sayfasına git
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Renkli üst bar
-            Container(
-              height: 100,
-              decoration: BoxDecoration(
-                color: _getClassColor(classData['color'] ?? 0),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
-              ),
-            ),
-            // Sınıf bilgileri
-            Expanded(
-              child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // --- BAŞLIK (SINIF ADI) ---
                     Text(
-                      classData['name'] ?? 'Sınıf Adı',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.blue.shade900,
+                      classData['name'] ?? 'Bilinmeyen Sınıf',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: accentColor, // Başlık rengini tema rengi yapıyoruz
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      classData['section'] ?? '',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.blue.shade700,
-                      ),
+
+                    // --- DETAYLAR ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // KOD
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'KOD:',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                            Text(
+                              classData['code'] ?? 'Yok',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // ÖĞRENCİ SAYISI
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'ÖĞRENCİ SAYISI:',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                Icon(Icons.people, size: 18, color: theme.colorScheme.secondary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$studentCount',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+
+                        // DURUM İKONU (Hoca veya Öğrenci)
+                        isTeacher
+                            ? Icon(Icons.school, color: accentColor, size: 30) // Hoca Simgesi
+                            : Icon(Icons.check_circle, color: Colors.green.shade600, size: 30), // Öğrenci Simgesi (Katıldı)
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Color _getClassColor(int index) {
-    final colors = [
-      Colors.blue.shade600,
-      Colors.green.shade600,
-      Colors.red.shade600,
-      Colors.orange.shade600,
-      Colors.purple.shade600,
-      Colors.teal.shade600,
-    ];
-    return colors[index % colors.length];
+  // --- YARDIMCI FONKSİYONLAR ---
+
+  void _showProfileMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) => ProfileMenuSheet(isTeacher: isTeacher),
+    );
   }
 
   void _showCreateClassDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-        ),
-        shadowColor: Colors.black.withValues(alpha: 0.25),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Başlık
-              Text(
-                'Sınıf Oluştur',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.blue.shade900,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Sınıf adı alanı
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Sınıf Adı',
-                  labelStyle: TextStyle(color: Colors.blue.shade800),
-                  prefixIcon: Icon(Icons.class_, color: Colors.blue.shade600),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: Colors.transparent),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: Colors.transparent),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
-                  ),
-                  filled: true,
-                  fillColor: Colors.blue.shade50,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Bölüm alanı
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Bölüm (Opsiyonel)',
-                  labelStyle: TextStyle(color: Colors.blue.shade800),
-                  prefixIcon: Icon(Icons.description, color: Colors.blue.shade600),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: Colors.transparent),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: Colors.transparent),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
-                  ),
-                  filled: true,
-                  fillColor: Colors.blue.shade50,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Butonlar
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.blue.shade600,
-                        side: BorderSide(color: Colors.blue.shade600, width: 2),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: const Text(
-                        'İptal',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Sınıf oluşturma özelliği yakında eklenecek.'),
-                            backgroundColor: Colors.blue.shade600,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade600,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: const Text(
-                        'Oluştur',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (context) => const CreateClassDialog(),
     );
   }
 
   void _showJoinClassDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-        ),
-        shadowColor: Colors.black.withValues(alpha: 0.25),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Başlık
-              Text(
-                'Sınıfa Katıl',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.blue.shade900,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Sınıf kodu alanı
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Sınıf Kodu',
-                  hintText: '6 haneli kodu girin',
-                  labelStyle: TextStyle(color: Colors.blue.shade800),
-                  prefixIcon: Icon(Icons.vpn_key, color: Colors.blue.shade600),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: Colors.transparent),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: Colors.transparent),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
-                  ),
-                  filled: true,
-                  fillColor: Colors.blue.shade50,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                ),
-                maxLength: 6,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 4,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Butonlar
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.blue.shade600,
-                        side: BorderSide(color: Colors.blue.shade600, width: 2),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: const Text(
-                        'İptal',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Sınıfa katılma özelliği yakında eklenecek.'),
-                            backgroundColor: Colors.blue.shade600,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade600,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: const Text(
-                        'Katıl',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (context) => const JoinClassDialog(),
     );
   }
 }
