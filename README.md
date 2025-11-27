@@ -1,4 +1,4 @@
-# 📋 C Lens - Yüz Tanıma ile Yoklama Sistemi
+  # 📋 C Lens - Yüz Tanıma ile Yoklama Sistemi
 
 **Fırat Üniversitesi Yazılım Mühendisliği - Veritabanı Yönetim Sistemleri** dersi kapsamında geliştirilen, mobil tabanlı akıllı yoklama sistemi.
 
@@ -32,7 +32,7 @@ Bu proje, geleneksel imza veya isim okuma yöntemlerinin yerini alarak; Yüz Tan
 Bu proje, **Fırat Üniversitesi Yazılım Mühendisliği** öğrencileri tarafından geliştirilmektedir.
 
 | İsim Soyisim | Rol |
-| :--- | :--- |
+| :--- | :--- | :--- |
 | **Miraç Doğan** | Scrum Master | Proje Yönetimi, Mimari Tasarım |
 | **Yasir Dönmez** | Team Member | Mobil Arayüz Geliştirme (UI/UX), AI Model Entegrasyonu |
 | **Hakan Kuru** | Team Member | Database Yönetimi, Backend Servisleri |
