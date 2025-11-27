@@ -15,7 +15,7 @@ dependencies:
     sdk: flutter
 
   # Yüz embedding modeli için
-  tflite_flutter: ^0.10.0
+  tflite_flutter: ^0.11.0
   # Görüntü işleme (resize / normalize vs.)
   image: ^4.1.7
   # Kamera erişimif
@@ -55,3 +55,6 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/models/
