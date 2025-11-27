@@ -34,3 +34,14 @@
 
 # --- Hata Logları ---
 *.log
+
+# --- Antigravity/VS Code tarafında olusan ekstra dosyalar ---
+.vscode-test/
+
+# --- FLUTTER PLATFORM URETILEN PLUGIN KAYIT DOSYALARI ---
+# Bu kisim, 'flutter run' sonrasi olusan 'generated' dosyalari kapsar
+# (Sizin gorduugunuz 7 degisiklik buradaki dosyalardi)
+**/*generated_plugin_registrant*
+**/*generated_plugins*
+GeneratedPluginRegistrant.swift
+
