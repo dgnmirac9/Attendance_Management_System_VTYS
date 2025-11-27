@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
-import '../../../authentication/data/auth_service.dart';
+import 'package:c_lens_mobile/features/authentication/data/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../shared/utils/snackbar_utils.dart';
 
 class JoinClassDialog extends StatefulWidget {
   const JoinClassDialog({super.key});
@@ -25,9 +26,7 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
   void _handleJoin() async {
     final code = _codeController.text.trim();
     if (code.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lütfen 6 haneli sınıf kodunu girin.')),
-      );
+      SnackbarUtils.showError(context, 'Lütfen 6 haneli sınıf kodunu girin.');
       return;
     }
 
@@ -44,15 +43,11 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
     if (error == null) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sınıfa başarıyla katıldınız!'), backgroundColor: Colors.green),
-        );
+        SnackbarUtils.showSuccess(context, 'Sınıfa başarıyla katıldınız!');
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error), backgroundColor: Colors.red),
-        );
+        SnackbarUtils.showError(context, error);
       }
     }
   }
@@ -62,7 +57,7 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
     final primaryColor = Theme.of(context).primaryColor;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      // shape: DialogTheme'den geliyor
       child: Padding(
         padding: const EdgeInsets.all(24.0), 
         child: Column(
@@ -85,7 +80,7 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
                 hintText: '6 HANELİ KOD', 
                 hintStyle: TextStyle(fontSize: 16, letterSpacing: 1),
                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 15), 
-                border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                // border: InputDecorationTheme'den geliyor
               ),
               enabled: !_isLoading, 
             ),
@@ -98,10 +93,7 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _isLoading ? null : () => Navigator.pop(context), 
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(56),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+                    // style: OutlinedButtonTheme'den geliyor
                     child: const Text('İptal'),
                   ),
                 ),
@@ -109,10 +101,7 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleJoin, 
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(56),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+                    // style: ElevatedButtonTheme'den geliyor
                     child: _isLoading 
                         ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Text('Katıl'),

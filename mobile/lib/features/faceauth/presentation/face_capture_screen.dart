@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-// YENİ İMPORT: DRY prensibi için ortak widget'ı çağırıyoruz
 import '../../../../shared/themes/custom_transparent_appbar.dart'; 
+import '../../../../shared/utils/snackbar_utils.dart'; 
 
 class FaceCaptureScreen extends StatefulWidget {
   const FaceCaptureScreen({super.key});
@@ -23,6 +23,15 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
   final List<_Pose> _sequence = const [_Pose.front, _Pose.right, _Pose.left, _Pose.upSmile];
   int _stepIndex = 0;
   final List<String> _captures = <String>[];
+
+  // Yüz dedektörü
+  final FaceDetector _faceDetector = FaceDetector(
+    options: FaceDetectorOptions(
+      performanceMode: FaceDetectorMode.accurate,
+      enableLandmarks: true,
+      enableClassification: true,
+    ),
+  );
 
   @override
   void initState() {
@@ -53,69 +62,102 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
   @override
   void dispose() {
     _controller?.dispose();
+    _faceDetector.close();
     super.dispose();
   }
 
   Future<void> _captureAndValidate() async {
-    if (_controller == null) return;
+    if (_controller == null || _busy) return;
     setState(() => _busy = true);
+    
     try {
       await _initializeFuture;
       final XFile shot = await _controller!.takePicture();
+      final File file = File(shot.path);
+      final InputImage inputImage = InputImage.fromFile(file);
 
-      final FaceDetectorOptions options = FaceDetectorOptions(
-        performanceMode: FaceDetectorMode.accurate,
-        enableLandmarks: false,
-        enableContours: false,
-        enableClassification: true,
-      );
-      final FaceDetector detector = FaceDetector(options: options);
-      final InputImage input = InputImage.fromFilePath(shot.path);
-      final List<Face> faces = await detector.processImage(input);
-      await detector.close();
+      final List<Face> faces = await _faceDetector.processImage(inputImage);
 
       if (faces.isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Yüz algılanamadı. Lütfen tekrar deneyin.')),
-        );
-        setState(() => _busy = false);
-        return;
+        throw 'Yüz bulunamadı. Lütfen kameraya bakın.';
+      }
+      if (faces.length > 1) {
+        throw 'Birden fazla yüz algılandı. Tek kişi olmalı.';
       }
 
-      if (_sequence[_stepIndex] == _Pose.upSmile) {
-        final double? prob = faces.first.smilingProbability;
-        if (prob != null && prob < 0.5) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Gülümseme tespit edilemedi. Lütfen gülümseyin.')),
-          );
-          setState(() => _busy = false);
-          return;
+      final Face face = faces.first;
+      final _Pose currentPose = _sequence[_stepIndex];
+
+      _validatePose(face, currentPose);
+
+      // Başarılı
+      _captures.add(shot.path);
+      
+      if (_captures.length == _sequence.length) {
+        if (mounted) {
+          SnackbarUtils.showSuccess(context, 'Tüm taramalar tamamlandı!');
+          Navigator.pop(context, _captures);
+        }
+      } else {
+        if (mounted) {
+          SnackbarUtils.showSuccess(context, 'Başarılı! Sıradaki adıma geçiliyor.');
+          setState(() {
+            _stepIndex++;
+          });
         }
       }
 
-      _captures.add(shot.path);
-      if (_stepIndex < _sequence.length - 1) {
-        setState(() {
-          _stepIndex += 1;
-          _busy = false;
-        });
-      } else {
-        if (!mounted) return;
-        // FaceAuth işlemi bitti, kayıt formuna geri dönecek
-        Navigator.of(context).pop<List<String>>(_captures);
-      }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
-      setState(() => _busy = false);
+      if (mounted) {
+        SnackbarUtils.showError(context, e.toString());
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _validatePose(Face face, _Pose pose) {
+    final double headEulerAngleY = face.headEulerAngleY ?? 0; // Sağa/Sola dönüş
+    final double headEulerAngleX = face.headEulerAngleX ?? 0; // Yukarı/Aşağı eğim
+    final double? smilingProbability = face.smilingProbability;
+
+    switch (pose) {
+      case _Pose.front:
+        if (headEulerAngleY.abs() > 10 || headEulerAngleX.abs() > 10) {
+          throw 'Lütfen tam karşıya bakın.';
+        }
+        break;
+      case _Pose.right:
+        // Kullanıcı sağa dönünce Y açısı negatif olur (ayna etkisi yoksa) veya pozitif. 
+        // Genelde: Sola dönünce pozitif, sağa dönünce negatif.
+        // Eşik değerleri test edilmeli, şimdilik varsayılan mantık.
+        if (headEulerAngleY > -20) { 
+          throw 'Yüzünüzü biraz daha sağa çevirin.';
+        }
+        break;
+      case _Pose.left:
+        if (headEulerAngleY < 20) {
+          throw 'Yüzünüzü biraz daha sola çevirin.';
+        }
+        break;
+      case _Pose.upSmile:
+        if (headEulerAngleX > -10) { // Yukarı bakınca X negatif olur (genelde)
+           // throw 'Biraz yukarı bakın.'; // Çok katı olmamak için kapattım
+        }
+        if (smilingProbability != null && smilingProbability < 0.5) {
+          throw 'Lütfen gülümseyin!';
+        }
+        break;
     }
   }
 
   void _skipOptional() {
+    // Sadece son adım (upSmile) opsiyonel kabul ediliyor
     if (_sequence[_stepIndex] == _Pose.upSmile) {
-      Navigator.of(context).pop<List<String>>(_captures);
+       if (mounted) {
+          SnackbarUtils.showInfo(context, 'Son adım atlandı. Kayıt tamamlanıyor.');
+          Navigator.pop(context, _captures);
+       }
     }
   }
 
@@ -130,14 +172,12 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // FIX: surfaceColor değişkenini burada tanımlıyoruz
     final theme = Theme.of(context);
     final surfaceColor = theme.colorScheme.surface.withOpacity(0.85); 
-    const fixedTextColor = Colors.white; // Talimat yazısı için yüksek kontrast
+    const fixedTextColor = Colors.white; 
 
     return Scaffold(
       extendBodyBehindAppBar: true, 
-      // FIX: Özel AppBar'ı çağırıyoruz
       appBar: const CustomTransparentAppBar(
         titleText: 'Yüz Taraması', 
       ),
@@ -216,7 +256,6 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
                                       Expanded(
                                         child: Container(
                                           margin: const EdgeInsets.only(right: 12),
-                                          // FIX: surfaceColor değişkenini kullanıyoruz
                                           decoration: BoxDecoration(
                                             color: surfaceColor, 
                                             borderRadius: BorderRadius.circular(20)

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../../shared/utils/validators.dart';
-import '../../data/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:c_lens_mobile/features/authentication/data/auth_service.dart';
+import '../../../../shared/utils/validators.dart';
+import '../../../../shared/utils/snackbar_utils.dart';
 
 class ChangePasswordDialog extends StatefulWidget {
   const ChangePasswordDialog({super.key});
@@ -26,6 +27,14 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
   // Mevcut kullanıcının e-postasını alıyoruz (re-auth için lazım)
   final String? currentUserEmail = FirebaseAuth.instance.currentUser?.email;
 
+  @override
+  void dispose() {
+    _oldPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
   // --- ŞİFRE GÜNCELLEME İŞLEMİ ---
   void _handleChangePassword() async {
     if (!_formKey.currentState!.validate() || currentUserEmail == null) return;
@@ -34,33 +43,26 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
 
     String? error = await _authService.updatePassword(
       email: currentUserEmail!,
-      oldPassword: _oldPasswordController.text.trim(),
-      newPassword: _newPasswordController.text.trim(),
+      oldPassword: _oldPasswordController.text,
+      newPassword: _newPasswordController.text,
     );
 
-    if (mounted) setState(() => _isLoading = false);
-
-    if (error == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Şifre başarıyla güncellendi! Lütfen tekrar giriş yapın.'), backgroundColor: Colors.green),
-      );
-      Navigator.pop(context); // Diyaloğu kapat
-      // Kullanıcıyı Login sayfasına at (Firebase kuralı gereği)
-      await _authService.signOut();
-      if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-    } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.red),
-      );
+    if (mounted) {
+      setState(() => _isLoading = false);
+      
+      if (error == null) {
+        Navigator.pop(context); // Diyaloğu kapat
+        SnackbarUtils.showSuccess(context, 'Şifreniz başarıyla güncellendi!');
+      } else {
+        SnackbarUtils.showError(context, error);
+      }
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(

@@ -35,6 +35,7 @@ class AuthService {
     required String lastName,
     required String role,
     String? studentNo,
+    List<List<double>>? faceEmbeddings, // YENİ: Yüz verileri
   }) async {
     try {
       debugPrint("🚀 1. Kayıt işlemi başladı...");
@@ -54,6 +55,7 @@ class AuthService {
         'uid': uid,
         'createdAt': FieldValue.serverTimestamp(),
         'studentNo': studentNo,
+        'faceEmbeddings': faceEmbeddings, // YENİ: Veritabanına kaydet
       });
 
       debugPrint("🎉 4. Veritabanına başarıyla kaydedildi!");

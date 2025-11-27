@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; 
-import '../../../../shared/utils/validators.dart'; // validateRequired fonksiyonu için
-import '../../../authentication/data/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../shared/utils/validators.dart';
+import 'package:c_lens_mobile/features/authentication/data/auth_service.dart';
+import '../../../../shared/utils/snackbar_utils.dart';
 
 class CreateClassDialog extends StatefulWidget {
   const CreateClassDialog({super.key});
@@ -42,20 +43,11 @@ class _CreateClassDialogState extends State<CreateClassDialog> {
     if (result != null && !result.startsWith('Hata')) { 
       if (mounted) {
         Navigator.pop(context); // Diyaloğu kapat
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sınıf başarıyla oluşturuldu! Sınıf Kodunuz: $result'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 5), // Kodu rahat okuması için süreyi uzattık
-          ),
-        );
+        SnackbarUtils.showSuccess(context, 'Sınıf başarıyla oluşturuldu! Sınıf Kodunuz: $result');
       }
     } else {
       if (mounted) {
-        // Hata durumunda result bir String ("Hata: ...") döndürecektir.
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result ?? 'Bilinmeyen bir hata oluştu.'), backgroundColor: Colors.red),
-        );
+        SnackbarUtils.showError(context, result ?? 'Bilinmeyen bir hata oluştu.');
       }
     }
   }
@@ -65,7 +57,7 @@ class _CreateClassDialogState extends State<CreateClassDialog> {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      // shape: DialogTheme'den geliyor
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
