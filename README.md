@@ -31,7 +31,7 @@ Bu proje, geleneksel imza veya isim okuma yöntemlerinin yerini alarak; Yüz Tan
 
 Bu proje, **Fırat Üniversitesi Yazılım Mühendisliği** öğrencileri tarafından geliştirilmektedir.
 
-| İsim Soyisim | Rol |
+| İsim Soyisim | Rol | Görev / Sorumluluk |
 | :--- | :--- | :--- |
 | **Miraç Doğan** | Scrum Master | Proje Yönetimi, Mimari Tasarım |
 | **Yasir Dönmez** | Team Member | Mobil Arayüz Geliştirme (UI/UX), AI Model Entegrasyonu |
