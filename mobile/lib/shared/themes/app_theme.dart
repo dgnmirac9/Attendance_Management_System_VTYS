@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // --- AÇIK TEMA RENKLERİ ---
-  static const Color _lightPrimary = Color(0xFF1E88E5); 
-  static const Color _lightBackground = Color(0xFFF0F4F8); 
-  static const Color _lightSurface = Colors.white; 
-  static const Color _lightTextPrimary = Color(0xFF1565C0); 
-  static const Color _lightBorder = Color(0xFF90CAF9); 
+  // --- ORTAK SABİTLER ---
+  static const double _borderRadius = 16.0; // Standart Yuvarlaklık
 
-  // --- KOYU TEMA RENKLERİ ---
-  static const Color _darkPrimary = Color(0xFF90CAF9); 
-  static const Color _darkBackground = Color(0xFF121212); 
-  static const Color _darkSurface = Color(0xFF1E1E1E); 
-  static const Color _darkTextPrimary = Color(0xFFE3F2FD); 
-  static const Color _darkBorder = Color(0xFF424242); 
+  // --- MAVİ PALET: AÇIK TEMA RENKLERİ ---
+  static const Color _lightPrimary = Color(0xFF1E88E5); // Mavi 600 (Güçlü Mavi)
+  static const Color _lightBackground = Color(0xFFE3F2FD); // Mavi 50 (Çok Açık Zemin)
+  static const Color _lightSurface = Colors.white; // Kartlar
+  static const Color _lightTextPrimary = Color(0xFF1565C0); // Mavi 800 (Koyu Mavi Yazı)
+  static const Color _lightBorder = Color(0xFFBBDEFB); // Mavi 100 (Pasif Çerçeve)
+
+  // --- MAVİ PALET: KOYU TEMA RENKLERİ (Yüksek Kontrast) ---
+  static const Color _darkPrimary = Color(0xFF64B5F6); // Mavi 300 (Koyu zeminde parlayan aksan)
+  static const Color _darkBackground = Color(0xFF121212); // Klasik Koyu Zemin
+  static const Color _darkSurface = Color(0xFF212121); // Kartlar
+  // FIX: Koyu zeminde okunurluğu artırmak için Input kutularını bir tık daha açık yapıyoruz
+  static const Color _darkInputFill = Color(0xFF2D3748); 
+  static const Color _darkTextPrimary = Colors.white; // Yazı her zaman Beyaz
+  static const Color _darkBorder = Color(0xFF424242); // Koyu Gri Çerçeve
 
   // ===========================================================================
   // AÇIK TEMA (Light)
@@ -26,16 +31,16 @@ class AppTheme {
         seedColor: _lightPrimary,
         primary: _lightPrimary,
         surface: _lightSurface,
-        error: Colors.red.shade600,
+        onSurface: _lightTextPrimary,
+        error: const Color(0xFFDC2626),
       ),
       scaffoldBackgroundColor: _lightBackground,
-
-      // AppBar
+      
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        titleTextStyle: TextStyle(color: _lightTextPrimary, fontSize: 24, fontWeight: FontWeight.w600),
+        titleTextStyle: TextStyle(color: _lightTextPrimary, fontSize: 20, fontWeight: FontWeight.bold),
         iconTheme: IconThemeData(color: _lightTextPrimary),
       ),
 
@@ -43,23 +48,24 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: _lightSurface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: const BorderSide(color: _lightBorder)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: const BorderSide(color: _lightBorder, width: 1.5)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: const BorderSide(color: _lightPrimary, width: 2.5)),
-        labelStyle: const TextStyle(color: _lightTextPrimary),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _lightBorder)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _lightBorder, width: 1.5)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _lightPrimary, width: 2.5)),
+        labelStyle: TextStyle(color: _lightTextPrimary.withOpacity(0.7)),
         prefixIconColor: _lightPrimary,
       ),
 
-      // Butonlar (DÜZELTİLDİ: minimumSize EKLENDİ)
+      // Butonlar
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: _lightPrimary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          minimumSize: const Size(double.infinity, 56), // <-- İŞTE BU EKSİKTİ
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_borderRadius)),
+          minimumSize: const Size(double.infinity, 56),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          elevation: 3,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -67,16 +73,23 @@ class AppTheme {
           foregroundColor: _lightPrimary,
           side: const BorderSide(color: _lightPrimary, width: 2),
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          minimumSize: const Size(double.infinity, 56), // <-- İŞTE BU EKSİKTİ
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_borderRadius)),
+          minimumSize: const Size(double.infinity, 56),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
       
       // Bottom Sheet
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: _lightSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(_borderRadius * 1.5))),
+      ),
+      
+      // Floating Action Button
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: _lightPrimary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(_borderRadius))),
       ),
     );
   }
@@ -92,41 +105,42 @@ class AppTheme {
         seedColor: _darkPrimary,
         primary: _darkPrimary,
         surface: _darkSurface,
+        onSurface: _darkTextPrimary,
         brightness: Brightness.dark,
-        error: Colors.red.shade300,
+        error: const Color(0xFFEF4444),
       ),
       scaffoldBackgroundColor: _darkBackground,
 
-      // AppBar
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        titleTextStyle: TextStyle(color: _darkTextPrimary, fontSize: 24, fontWeight: FontWeight.w600),
+        titleTextStyle: TextStyle(color: _darkTextPrimary, fontSize: 20, fontWeight: FontWeight.bold),
         iconTheme: IconThemeData(color: _darkTextPrimary),
       ),
 
-      // Form Alanları
+      // FIX: Form Alanları
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: _darkSurface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: const BorderSide(color: _darkBorder)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: const BorderSide(color: _darkBorder, width: 1.5)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: const BorderSide(color: _darkPrimary, width: 2.5)),
-        labelStyle: const TextStyle(color: _darkTextPrimary),
+        fillColor: _darkInputFill, // <-- DAHA AÇIK DOLGU RENGİ
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _darkBorder)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _darkBorder, width: 1.5)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _darkPrimary, width: 2.5)),
+        labelStyle: TextStyle(color: _darkTextPrimary.withOpacity(0.7)),
         prefixIconColor: _darkPrimary,
       ),
 
-      // Butonlar (DÜZELTİLDİ: minimumSize EKLENDİ)
+      // Butonlar
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: _darkPrimary,
-          foregroundColor: _darkBackground,
+          foregroundColor: _darkBackground, 
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          minimumSize: const Size(double.infinity, 56), // <-- BURAYA DA EKLENDİ
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_borderRadius)),
+          minimumSize: const Size(double.infinity, 56),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          elevation: 3,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -134,16 +148,23 @@ class AppTheme {
           foregroundColor: _darkPrimary,
           side: const BorderSide(color: _darkPrimary, width: 2),
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          minimumSize: const Size(double.infinity, 56), // <-- BURAYA DA EKLENDİ
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_borderRadius)),
+          minimumSize: const Size(double.infinity, 56),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
 
       // Bottom Sheet
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: _darkSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(_borderRadius * 1.5))),
+      ),
+      
+      // Floating Action Button
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: _darkPrimary,
+        foregroundColor: Colors.black,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(_borderRadius))),
       ),
     );
   }
