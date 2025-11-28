@@ -1,7 +1,8 @@
+
 import 'package:flutter/material.dart';
 import '../../../../routes.dart' as app_routes;
-import '../../../../shared/themes/theme_manager.dart'; // Tema Yöneticisi
-import '../../../authentication/presentation/screens/edit_profile_screen.dart'; // EditProfileScreen'ı ekle
+import '../../../../shared/themes/theme_manager.dart';
+import '../../../authentication/presentation/screens/edit_profile_screen.dart';
 
 class ProfileMenuSheet extends StatelessWidget {
   final bool isTeacher;
@@ -11,17 +12,19 @@ class ProfileMenuSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    final errorColor = theme.colorScheme.error;
-    final borderColor = theme.inputDecorationTheme.enabledBorder?.borderSide.color ?? Colors.grey.shade300;
-
-    // Şu anki tema karanlık mı?
     final isDarkMode = theme.brightness == Brightness.dark;
+
+    // Renk Paleti (Kullanıcının istediği açık mavi tonlar)
+    final backgroundColor = isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFE3F2FD); // Light Blue 50
+    final cardColor = isDarkMode ? theme.cardColor : const Color(0xFFBBDEFB); // Blue 100
+    final menuButtonColor = isDarkMode ? theme.cardColor : Colors.white;
+    final primaryColor = theme.colorScheme.primary;
+
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
+        color: backgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: Column(
@@ -31,7 +34,7 @@ class ProfileMenuSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.1),
+              color: cardColor,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -40,9 +43,9 @@ class ProfileMenuSheet extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: theme.cardColor,
+                    color: Colors.white,
                     shape: BoxShape.circle,
-                    border: Border.all(color: primaryColor.withOpacity(0.3), width: 2),
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
                   child: Icon(Icons.face, size: 40, color: primaryColor),
                 ),
@@ -56,9 +59,9 @@ class ProfileMenuSheet extends StatelessWidget {
                       Text(
                         isTeacher ? "Öğretim Görevlisi" : "Öğrenci",
                         style: TextStyle(
-                          fontSize: 16, // Biraz küçülttük sığsın diye
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: theme.textTheme.bodyLarge?.color,
+                          color: isDarkMode ? Colors.white : const Color(0xFF1565C0), // Blue 800
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -66,31 +69,32 @@ class ProfileMenuSheet extends StatelessWidget {
                         isTeacher ? "Hoca Paneli" : "Öğrenci Paneli",
                         style: TextStyle(
                           fontSize: 13,
-                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                          color: isDarkMode ? Colors.white70 : const Color(0xFF1976D2).withValues(alpha: 0.7), // Blue 700
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                // --- TEMA DEĞİŞTİRME DÜĞMESİ ---
-                // Güneş / Ay İkonlu Switch
-                Transform.scale(
-                  scale: 0.8, // Biraz kibar dursun
+                // Tema Değiştirme Switch'i
+                Container(
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[800] : Colors.white,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
                   child: Switch(
                     value: isDarkMode,
-                    activeColor: Colors.white,
-                    activeTrackColor: Colors.indigo,
-                    inactiveThumbColor: Colors.orange,
-                    inactiveTrackColor: Colors.orange.withOpacity(0.2),
+                    activeTrackColor: Colors.grey,
+                    activeThumbColor: Colors.white,
+                    inactiveThumbColor: Colors.grey,
+                    trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
                     thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
                       if (states.contains(WidgetState.selected)) {
-                        return const Icon(Icons.nightlight_round, color: Colors.indigo);
+                        return const Icon(Icons.nightlight_round, color: Colors.black);
                       }
-                      return const Icon(Icons.wb_sunny, color: Colors.white);
+                      return const Icon(Icons.wb_sunny, color: Colors.orange);
                     }),
                     onChanged: (value) {
-                      // Temayı değiştir ve kaydet
                       ThemeManager.toggleTheme(value);
                     },
                   ),
@@ -104,9 +108,11 @@ class ProfileMenuSheet extends StatelessWidget {
           // --- MENÜ SEÇENEKLERİ ---
           _buildMenuOption(
             context: context,
-            icon: Icons.edit_outlined,
+            icon: Icons.edit,
             title: 'Bilgilerimi Düzenle',
-            borderColor: borderColor,
+            backgroundColor: menuButtonColor,
+            iconColor: const Color(0xFF1976D2), // Blue 700
+            textColor: const Color(0xFF0D47A1), // Blue 900
             onTap: () {
               Navigator.pop(context);
               Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
@@ -119,7 +125,9 @@ class ProfileMenuSheet extends StatelessWidget {
               context: context,
               icon: Icons.face_retouching_natural,
               title: 'Yüz Verisini Güncelle',
-              borderColor: borderColor,
+              backgroundColor: menuButtonColor,
+              iconColor: const Color(0xFF1976D2),
+              textColor: const Color(0xFF0D47A1),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, app_routes.Routes.faceCapture);
@@ -133,9 +141,10 @@ class ProfileMenuSheet extends StatelessWidget {
             context: context,
             icon: Icons.logout_rounded,
             title: 'Çıkış Yap',
-            borderColor: errorColor.withOpacity(0.3),
-            iconColor: errorColor,
-            textColor: errorColor,
+            backgroundColor: menuButtonColor, // Screenshot'ta beyaz görünüyor, kırmızı border var
+            iconColor: const Color(0xFFD32F2F), // Red 700
+            textColor: const Color(0xFFC62828), // Red 800
+            isLogout: true,
             onTap: () {
               Navigator.pop(context);
               Navigator.pushNamedAndRemoveUntil(
@@ -153,35 +162,38 @@ class ProfileMenuSheet extends StatelessWidget {
     required BuildContext context,
     required IconData icon,
     required String title,
-    required Color borderColor,
+    required Color backgroundColor,
     required VoidCallback onTap,
     Color? iconColor,
     Color? textColor,
+    bool isLogout = false,
   }) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(30), // Daha yuvarlak köşeler
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: theme.cardColor,
-          border: Border.all(color: borderColor, width: 1.5),
-          borderRadius: BorderRadius.circular(20),
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(30),
+          border: isLogout ? Border.all(color: const Color(0xFFFFCDD2), width: 1.5) : null, // Sadece çıkışta kırmızı border
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+             if (!isLogout) // Çıkış butonunda gölge yok gibi duruyor screenshotta, diğerlerinde olabilir
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 5, offset: const Offset(0, 2))
           ],
         ),
         child: Row(
           children: [
-            Icon(icon, color: iconColor ?? primary, size: 26),
+            Icon(icon, color: iconColor, size: 24),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textColor ?? theme.textTheme.bodyLarge?.color),
+                style: TextStyle(
+                  fontSize: 16, 
+                  fontWeight: FontWeight.w600, 
+                  color: textColor,
+                ),
               ),
             ),
             Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey.shade400),

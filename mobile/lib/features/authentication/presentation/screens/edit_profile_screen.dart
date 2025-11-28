@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:c_lens_mobile/features/authentication/data/auth_service.dart';
 import '../../../../shared/utils/validators.dart';
-import '../../data/auth_service.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // UID için
-import 'package:cloud_firestore/cloud_firestore.dart'; // Veri modeli için (optional)
-import '../widgets/change_password_dialog.dart'; // Şifre değiştirme dialogu için
+import '../widgets/change_password_dialog.dart';
+import '../../../../shared/utils/snackbar_utils.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -22,7 +22,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController _studentNoController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
 
-  Map<String, dynamic>? _userData;
+
   bool _isLoading = true;
   String? _userRole; // Rolü tutacağız
 
@@ -30,6 +30,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _fetchUserData();
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _studentNoController.dispose();
+    _emailController.dispose();
+    super.dispose();
   }
 
   // --- MEVCUT VERİYİ FIREBASE'DEN ÇEKME FONKSİYONU ---
@@ -45,7 +54,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (mounted) {
       setState(() {
-        _userData = userMap;
+
         _isLoading = false;
         if (userMap != null) {
           _userRole = userMap['role'];
@@ -75,20 +84,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_userRole == 'student') {
       dataToUpdate['studentNo'] = _studentNoController.text.trim();
     }
-    
-    String? error = await _authService.updateUserData(dataToUpdate);
+
+    final error = await _authService.updateUserData(dataToUpdate);
 
     if (mounted) {
       setState(() => _isLoading = false);
       if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profil başarıyla güncellendi!')),
-        );
-        Navigator.pop(context); // Geri dön
+        SnackbarUtils.showSuccess(context, 'Profil başarıyla güncellendi!');
+        // Sayfada kalmaya devam ediyoruz, çıkış yapmıyoruz.
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $error'), backgroundColor: Colors.red),
-        );
+        SnackbarUtils.showError(context, error);
       }
     }
   }
@@ -98,7 +103,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    
+
     final theme = Theme.of(context);
     final isStudent = _userRole == 'student';
 
@@ -139,16 +144,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               // E-posta (Okunur ama düzenlenemez yapıyoruz, güvenlik için)
               TextFormField(
                 controller: _emailController,
-                readOnly: true, // E-posta değiştirilemesin
-                decoration: InputDecoration(
-                  labelText: 'E-posta (Değiştirilemez)', 
-                  prefixIcon: const Icon(Icons.email),
-                  fillColor: theme.inputDecorationTheme.fillColor?.withOpacity(0.5),
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'E-posta', 
+                  prefixIcon: Icon(Icons.email),
+                  helperText: 'E-posta adresi değiştirilemez.',
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Öğrenci No Alanı (Sadece öğrenci ise görünür)
+              // Öğrenci Numarası (Sadece Öğrenciler İçin)
               if (isStudent) ...[
                 TextFormField(
                   controller: _studentNoController,

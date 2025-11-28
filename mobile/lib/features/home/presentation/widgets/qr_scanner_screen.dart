@@ -69,7 +69,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           // 2. KAMAŞTIRMA (DIMMER) EFEKTİ VE KARE DELİK
           ColorFiltered(
             colorFilter: ColorFilter.mode(
-              Colors.black.withOpacity(0.7), 
+              Colors.black.withValues(alpha: 0.7), 
               BlendMode.srcOut,
             ),
             child: Stack(

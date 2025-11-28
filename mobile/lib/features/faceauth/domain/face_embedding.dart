@@ -1,34 +1,30 @@
 import 'dart:math' show sqrt;
 
-/**
- * FaceEmbedding - Domain Model
- *
- * Bu sınıf bir kullanıcının yüzünü temsil eden sayısal vektörü (embedding) taşır.
- * MobileFaceNet gibi modeller, yüz görüntüsünü sabit uzunlukta (128 float) bir vektöre dönüştürür.
- *
- * Bu veri sadece "ham veri" değildir; kendi anlamı ve davranışı olan bir domain varlığıdır.
- * Yani, iki FaceEmbedding örneğinin birbirine ne kadar benzediğini söyleme görevi bu modele aittir.
- *
- * Neden davranış burada?
- * - Eğer karşılaştırma işlemi (cosine similarity) ViewModel veya UseCase içinde olsaydı,
- *   aynı hesaplama birçok yerde tekrar eder ve bakım / güvenlik sorunları oluşurdu.
- * - Domain Model, veriyi ve ona ait davranışı birlikte taşır → Clean Architecture prensibi.
- *
- * Nasıl kullanılır?
- *
- * final stored = FaceEmbedding(storedVector);
- * final scanned = FaceEmbedding(scannedVector);
- *
- * if (scanned.matches(stored)) {
- *   // Yüz doğrulandı → Login başarılı
- * } else {
- *   // Yüz uyuşmadı → Giriş reddedilir
- * }
- *
- * Yani: ViewModel sadece "karar" verir. Matematik bu modelin içindedir.
- */
-
-
+/// FaceEmbedding Domain Model
+///
+/// Bu sınıf bir kullanıcının yüzünü temsil eden sayısal vektörü (embedding) taşır.
+/// MobileFaceNet gibi modeller, yüz görüntüsünü sabit uzunlukta (128 float) bir vektöre dönüştürür.
+///
+/// Bu veri sadece "ham veri" değildir; kendi anlamı ve davranışı olan bir domain varlığıdır.
+/// Yani, iki FaceEmbedding örneğinin birbirine ne kadar benzediğini söyleme görevi bu modele aittir.
+///
+/// Neden davranış burada?
+/// - Eğer karşılaştırma işlemi (cosine similarity) ViewModel veya UseCase içinde olsaydı,
+///   aynı hesaplama birçok yerde tekrar eder ve bakım / güvenlik sorunları oluşurdu.
+/// - Domain Model, veriyi ve ona ait davranışı birlikte taşır → Clean Architecture prensibi.
+///
+/// Nasıl kullanılır?
+///
+/// final stored = FaceEmbedding(storedVector);
+/// final scanned = FaceEmbedding(scannedVector);
+///
+/// if (scanned.matches(stored)) {
+///   // Yüz doğrulandı → Login başarılı
+/// } else {
+///   // Yüz uyuşmadı → Giriş reddedilir
+/// }
+///
+/// Yani: ViewModel sadece "karar" verir. Matematik bu modelin içindedir.
 class FaceEmbedding {
   /// Her zaman sabit uzunlukta (128 eleman) embedding listesi
   final List<double> values;
