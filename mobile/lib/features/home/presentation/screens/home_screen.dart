@@ -110,7 +110,6 @@ class HomeScreen extends StatelessWidget {
           final studentCount = classData['studentUids']?.length ?? 0;
           final classCode = classData['code'] ?? 'Yok';
           final className = classData['name'] ?? 'Bilinmeyen Sınıf';
-          final teacherName = classData['teacherName'] ?? 'Bilinmiyor'; // Assuming this field exists or we pass something else
           
           return Padding(
             padding: const EdgeInsets.only(bottom: 12.0),
@@ -122,7 +121,7 @@ class HomeScreen extends StatelessWidget {
                     builder: (context) => ClassDetailsScreen(
                       className: className,
                       classCode: classCode,
-                      teacherName: teacherName,
+                      teacherUid: classData['teacherUid'] ?? '',
                     ),
                   ),
                 );

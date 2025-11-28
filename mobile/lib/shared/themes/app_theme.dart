@@ -6,7 +6,8 @@ class AppTheme {
 
   // --- MAVİ PALET: AÇIK TEMA RENKLERİ ---
   static const Color _lightPrimary = Color(0xFF1E88E5); // Mavi 600 (Güçlü Mavi)
-  static const Color _lightBackground = Color(0xFFE3F2FD); // Mavi 50 (Çok Açık Zemin)
+  // DEĞİŞİKLİK BURADA: Daha güçlendirilmiş açık mavi zemin
+  static const Color _lightBackground = Color(0xFFD0E6FA); // Daha dolgun Mavi (Mavi 50'den daha güçlü)
   static const Color _lightSurface = Colors.white; // Kartlar
   static const Color _lightTextPrimary = Color(0xFF1565C0); // Mavi 800 (Koyu Mavi Yazı)
   static const Color _lightBorder = Color(0xFFBBDEFB); // Mavi 100 (Pasif Çerçeve)
@@ -15,8 +16,7 @@ class AppTheme {
   static const Color _darkPrimary = Color(0xFF64B5F6); // Mavi 300 (Koyu zeminde parlayan aksan)
   static const Color _darkBackground = Color(0xFF121212); // Klasik Koyu Zemin
   static const Color _darkSurface = Color(0xFF212121); // Kartlar
-  // FIX: Koyu zeminde okunurluğu artırmak için Input kutularını bir tık daha açık yapıyoruz
-  static const Color _darkInputFill = Color(0xFF2D3748); 
+  static const Color _darkInputFill = Color(0xFF2D3748); // Koyu temada input alanı dolgu
   static const Color _darkTextPrimary = Colors.white; // Yazı her zaman Beyaz
   static const Color _darkBorder = Color(0xFF424242); // Koyu Gri Çerçeve
 

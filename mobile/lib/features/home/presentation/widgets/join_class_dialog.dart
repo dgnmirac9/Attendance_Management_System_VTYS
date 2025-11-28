@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
-import 'package:c_lens_mobile/features/authentication/data/auth_service.dart';
+import '../../../authentication/data/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../shared/utils/snackbar_utils.dart';
 
@@ -54,16 +54,32 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
 
     return Dialog(
-      // shape: DialogTheme'den geliyor
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(24.0), 
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Sınıfa Katıl', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: primaryColor)),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: primaryColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.group_add, size: 40, color: primaryColor),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Sınıfa Katıl', 
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold, 
+                color: primaryColor
+              )
+            ),
             const SizedBox(height: 20),
 
             // Kod Giriş Alanı (SADECE 6 HANE)
@@ -76,11 +92,20 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
                 LengthLimitingTextInputFormatter(6), // Tam 6 hane
               ],
               style: const TextStyle(fontSize: 24, letterSpacing: 5, fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: '6 HANELİ KOD', 
-                hintStyle: TextStyle(fontSize: 16, letterSpacing: 1),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 15), 
-                // border: InputDecorationTheme'den geliyor
+                hintStyle: const TextStyle(fontSize: 16, letterSpacing: 1),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: primaryColor, width: 2),
+                ),
               ),
               enabled: !_isLoading, 
             ),
@@ -93,7 +118,10 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _isLoading ? null : () => Navigator.pop(context), 
-                    // style: OutlinedButtonTheme'den geliyor
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                     child: const Text('İptal'),
                   ),
                 ),
@@ -101,7 +129,10 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleJoin, 
-                    // style: ElevatedButtonTheme'den geliyor
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                     child: _isLoading 
                         ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Text('Katıl'),

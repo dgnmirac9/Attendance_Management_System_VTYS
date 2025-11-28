@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../shared/utils/validators.dart';
-import 'package:c_lens_mobile/features/authentication/data/auth_service.dart';
+import '../../../authentication/data/auth_service.dart';
 import '../../../../shared/utils/snackbar_utils.dart';
 
 class CreateClassDialog extends StatefulWidget {
@@ -54,16 +54,32 @@ class _CreateClassDialogState extends State<CreateClassDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
 
     return Dialog(
-      // shape: DialogTheme'den geliyor
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Yeni Sınıf Oluştur', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor, fontSize: 20)),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: primaryColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.add_business, size: 40, color: primaryColor),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Yeni Sınıf Oluştur', 
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold, 
+                color: primaryColor
+              )
+            ),
             const SizedBox(height: 24),
             
             Form(
@@ -73,16 +89,36 @@ class _CreateClassDialogState extends State<CreateClassDialog> {
                   // Sınıf Adı
                   TextFormField(
                     controller: _classNameController,
-                    decoration: const InputDecoration(labelText: 'Sınıf Adı', prefixIcon: Icon(Icons.school)),
+                    decoration: const InputDecoration(
+                      labelText: 'Sınıf Adı', 
+                      prefixIcon: Icon(Icons.school),
+                      hintText: 'Örn: Matematik 101'
+                    ),
                     validator: (val) => validateRequired(val, fieldName: 'Sınıf Adı'),
                   ),
                   const SizedBox(height: 16),
                   
                   // Bilgilendirme Notu
-                  const Text(
-                    'Sınıf kodu otomatik olarak 6 haneli ve benzersiz şekilde üretilecektir.',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                    textAlign: TextAlign.center,
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Sınıf kodu otomatik olarak 6 haneli ve benzersiz şekilde üretilecektir.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
