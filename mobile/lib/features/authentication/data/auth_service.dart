@@ -160,7 +160,7 @@ class AuthService {
       debugPrint("🎉 SINIF BAŞARIYLA KATILINDI!");
       return null;
 
-    } on FirebaseException catch (e) {
+    } on FirebaseException {
       return "Sınıfa katılma sırasında bir hata oluştu.";
     }
   }
@@ -281,6 +281,11 @@ class AuthService {
         return doc.data() as Map<String, dynamic>;
       }).toList();
     });
+  }
+
+  // 5.1. Tek Bir Sınıfı Canlı Dinle
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getClassStream(String classCode) {
+    return _firestore.collection('classes').doc(classCode).snapshots();
   }
 
   // ==================================================
@@ -423,7 +428,7 @@ class AuthService {
       debugPrint("🗑️ Yoklama oturumu silindi: $sessionId");
     } catch (e) {
       debugPrint("❌ Yoklama silme hatası: $e");
-      throw e;
+      rethrow;
     }
   }
 
@@ -446,10 +451,90 @@ class AuthService {
   }
 
   // ==================================================
-  // 7. ÇIKIŞ YAPMA (SIGN OUT)
+  // 8. DUYURU YÖNETİMİ (ANNOUNCEMENTS)
+  // ==================================================
+
+  // 8.1. Duyuru Oluştur (Hoca)
+  Future<void> createAnnouncement({
+    required String classCode,
+    required String title,
+    required String content,
+    required String teacherUid,
+  }) async {
+    try {
+      await _firestore
+          .collection('classes')
+          .doc(classCode)
+          .collection('announcements')
+          .add({
+        'title': title,
+        'content': content,
+        'teacherUid': teacherUid,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      debugPrint("📢 Duyuru oluşturuldu: $title");
+    } catch (e) {
+      debugPrint("❌ Duyuru oluşturma hatası: $e");
+      rethrow;
+    }
+  }
+
+  // 8.2. Duyuruları Getir (Canlı Stream)
+  Stream<List<Map<String, dynamic>>> getAnnouncements(String classCode) {
+    return _firestore
+        .collection('classes')
+        .doc(classCode)
+        .collection('announcements')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id; // ID'yi de ekle
+        return data;
+      }).toList();
+    });
+  }
+
+  // 8.3. Duyuru Sil (Hoca)
+  Future<void> deleteAnnouncement(String classCode, String announcementId) async {
+    try {
+      await _firestore
+          .collection('classes')
+          .doc(classCode)
+          .collection('announcements')
+          .doc(announcementId)
+          .delete();
+      debugPrint("🗑️ Duyuru silindi: $announcementId");
+    } catch (e) {
+      debugPrint("❌ Duyuru silme hatası: $e");
+      rethrow;
+    }
+  }
+
+  // ==================================================
+  // 9. ÇIKIŞ YAPMA (SIGN OUT)
   // ==================================================
   Future<void> signOut() async {
     await _auth.signOut();
-    debugPrint("👋 Çıkış yapıldı.");
+    debugPrint("� Çıkış yapıldı.");
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getUserStream(String uid) {
+    return _firestore.collection('users').doc(uid).snapshots();
+  }
+
+  // Kullanıcının sınıf sıralamasını güncelle
+  Future<void> updateClassOrder(List<String> classCodes) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'classOrder': classCodes,
+      });
+    } catch (e) {
+      debugPrint("❌ Sınıf sıralaması güncellenemedi: $e");
+    }
   }
 }
