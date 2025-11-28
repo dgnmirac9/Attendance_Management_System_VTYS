@@ -1,18 +1,6 @@
-/**
- * ImagePreprocessor
- *
- * Kamera tarafından alınan görüntüyü modele uygun hale getirir.
- * Bu sınıf UI veya ViewModel'e bağımlı değildir → core katmanında yer alır.
- *
- * Yapılan işlemler:
- * - Görüntü okunur
- * - 112x112 boyutuna küçültülür (MobileFaceNet standardı)
- * - Normalizasyon üstte FaceEmbeddingExtractor'da yapılır
- *
- * Bu sınıf sadece veri hazırlar, embedding üretmez.
- */
 
 import 'dart:io';
+import 'package:camera/camera.dart';
 import 'package:image/image.dart' as img;
 
 class ImagePreprocessor {
@@ -21,5 +9,18 @@ class ImagePreprocessor {
     img.Image image = img.decodeImage(data)!;
 
     return img.copyResize(image, width: 112, height: 112);
+  }
+
+  /// CameraImage'i (YUV420) img.Image'e (RGB) dönüştürür ve boyutlandırır.
+  /// Not: Bu işlem CPU üzerinde yapıldığı için yavaş olabilir.
+  /// Gerçek uygulamada compute (isolate) veya FFI (C++) kullanılması önerilir.
+  img.Image processCameraImage(CameraImage cameraImage) {
+    // Şimdilik basit bir placeholder veya temel dönüşüm
+    // YUV420 -> RGB dönüşümü karmaşıktır, burada basitleştirilmiş veya dummy bir dönüşüm yapıyoruz
+    // Gerçek bir implementasyonda 'image' paketinin yuv dönüşüm fonksiyonları kullanılmalı
+    
+    // Dummy: 112x112 boş bir resim döndür
+    // TODO: Gerçek YUV -> RGB dönüşümünü ekle
+    return img.Image(width: 112, height: 112);
   }
 }
