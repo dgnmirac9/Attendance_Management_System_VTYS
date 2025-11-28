@@ -1,20 +1,17 @@
-/**
- * FaceEmbeddingExtractor
- *
- * Bu sınıf, MobileFaceNet modelini kullanarak görüntüden embedding üretir.
- * Model yükleme işlemi async olduğundan, constructor içinde _init() çağrılır.
- *
- * İş akışı:
- * 1) ImagePreprocessor → 112x112 normalize edilmiş img.Image
- * 2) FaceEmbeddingExtractor.run(image) → 128 boyutlu embedding
- * 3) FaceEmbedding → Domain model
- */
-
+import 'package:flutter/foundation.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 import '../../features/faceauth/domain/face_embedding.dart';
 
-// Sınıf ismi düzeltildi (PascalCase)
+/// FaceEmbeddingExtractor
+///
+/// Bu sınıf, MobileFaceNet modelini kullanarak görüntüden embedding üretir.
+/// Model yükleme işlemi async olduğundan, constructor içinde _init() çağrılır.
+///
+/// İş akışı:
+/// 1) ImagePreprocessor → 112x112 normalize edilmiş img.Image
+/// 2) FaceEmbeddingExtractor.run(image) → 128 boyutlu embedding
+/// 3) FaceEmbedding → Domain model
 class FaceEmbeddingExtractor {
   late Interpreter _interpreter;
   bool _isReady = false;
@@ -33,7 +30,7 @@ class FaceEmbeddingExtractor {
       _isReady = true;
     } catch (e) {
       // Model bulunamazsa sessizce devam et (Dummy mod)
-      print("UYARI: Yüz tanıma modeli yüklenemedi. Dummy mod aktif. Hata: $e");
+      debugPrint("UYARI: Yüz tanıma modeli yüklenemedi. Dummy mod aktif. Hata: $e");
       _isReady = false;
     }
   }
@@ -45,7 +42,7 @@ class FaceEmbeddingExtractor {
   FaceEmbedding run(img.Image image) {
     // EĞER MODEL YÜKLENEMEDİYSE DUMMY DATA DÖNDÜR
     if (!_isReady) {
-      print("UYARI: Model yüklü değil, sahte (dummy) embedding döndürülüyor.");
+      debugPrint("UYARI: Model yüklü değil, sahte (dummy) embedding döndürülüyor.");
       // 128 boyutlu rastgele veya sıfır vektörü döndür
       return FaceEmbedding(List.filled(128, 0.0));
     }
@@ -73,8 +70,7 @@ class FaceEmbeddingExtractor {
 
     return FaceEmbedding(output[0].cast<double>());
   }
-}
-//FaceEmbeddingExtractor sınıfını güncelledim.
+}//FaceEmbeddingExtractor sınıfını güncelledim.
 // Artık model dosyasını bulamazsa uygulama çökmeyecek,
 // bunun yerine "Dummy Mod" devreye girecek ve sahte (boş) veri üretecek.
 //<Bu sayede "Yüz Verisi Ekle" ekranına girip fotoğraf çekme akışını test edebilirsiniz.

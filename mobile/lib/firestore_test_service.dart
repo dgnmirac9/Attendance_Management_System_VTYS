@@ -1,6 +1,7 @@
 // lib/firebase/firestore_test_service.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart'; // debugPrint için eklendi
 
 /// Firestore bağlantısını hızlıca test etmek için basit bir servis.
 /// İlk defa kullandığın nesneler:
@@ -30,6 +31,6 @@ class FirestoreTestService {
     final snapshot = await docRef.get();
 
     // snapshot.data() -> dokümandaki Map<String, dynamic> veri
-    print('🔥 Firestore test data: ${snapshot.data()}');
+    debugPrint('🔥 Firestore test data: ${snapshot.data()}');
   }
 }
