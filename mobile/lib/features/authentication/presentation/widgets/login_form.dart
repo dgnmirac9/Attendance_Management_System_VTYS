@@ -75,16 +75,18 @@ class _LoginFormState extends State<LoginForm> {
               child: Form(
                 key: _formKey,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    // --- LOGO ---
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        Icons.face,
-                        size: 60,
+                        Icons.lock_outline,
+                        size: 48,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
