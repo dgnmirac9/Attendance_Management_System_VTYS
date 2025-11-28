@@ -111,9 +111,9 @@ class _AttendanceDetailScreenState extends State<AttendanceDetailScreen> {
               color: theme.colorScheme.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
-                  offset: const Offset(0, 5),
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -127,18 +127,10 @@ class _AttendanceDetailScreenState extends State<AttendanceDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    "${widget.attendeeUids.length} Katılımcı",
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
+                Text(
+                  "${widget.attendeeUids.length} Öğrenci Katıldı",
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: Colors.grey,
                   ),
                 ),
               ],
@@ -177,7 +169,7 @@ class _AttendanceDetailScreenState extends State<AttendanceDetailScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                                 child: Text(
                                   firstName.isNotEmpty ? firstName[0] : '?',
                                   style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),

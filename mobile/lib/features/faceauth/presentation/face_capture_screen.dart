@@ -173,7 +173,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final surfaceColor = theme.colorScheme.surface.withOpacity(0.85); 
+    final surfaceColor = theme.colorScheme.surface.withValues(alpha: 0.85); 
     const fixedTextColor = Colors.white; 
 
     return Scaffold(
@@ -236,9 +236,9 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
                                     fontWeight: FontWeight.bold,
                                     shadows: [
                                       Shadow(
-                                        offset: const Offset(0, 1),
-                                        blurRadius: 4.0,
-                                        color: Colors.black,
+                                        offset: const Offset(1, 1),
+                                        blurRadius: 3,
+                                        color: Colors.black.withValues(alpha: 0.8),
                                       ),
                                     ],
                                   ),

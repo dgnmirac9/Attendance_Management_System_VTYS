@@ -22,7 +22,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController _studentNoController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
 
-  Map<String, dynamic>? _userData;
+
   bool _isLoading = true;
   String? _userRole; // Rolü tutacağız
 
@@ -54,7 +54,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (mounted) {
       setState(() {
-        _userData = userMap;
+
         _isLoading = false;
         if (userMap != null) {
           _userRole = userMap['role'];
@@ -144,16 +144,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               // E-posta (Okunur ama düzenlenemez yapıyoruz, güvenlik için)
               TextFormField(
                 controller: _emailController,
-                readOnly: true, // E-posta değiştirilemesin
-                decoration: InputDecoration(
-                  labelText: 'E-posta (Değiştirilemez)', 
-                  prefixIcon: const Icon(Icons.email),
-                  fillColor: theme.inputDecorationTheme.fillColor?.withOpacity(0.5),
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'E-posta', 
+                  prefixIcon: Icon(Icons.email),
+                  helperText: 'E-posta adresi değiştirilemez.',
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Öğrenci No Alanı (Sadece öğrenci ise görünür)
+              // Öğrenci Numarası (Sadece Öğrenciler İçin)
               if (isStudent) ...[
                 TextFormField(
                   controller: _studentNoController,

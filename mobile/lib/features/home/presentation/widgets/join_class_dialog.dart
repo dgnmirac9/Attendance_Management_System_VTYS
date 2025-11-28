@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
+ 
 import '../../../authentication/data/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../shared/utils/snackbar_utils.dart';
@@ -55,7 +55,7 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
+
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -67,62 +67,48 @@ class _JoinClassDialogState extends State<JoinClassDialog> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.1),
-                shape: BoxShape.circle,
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.group_add, size: 40, color: primaryColor),
+              child: Icon(Icons.group_add, color: theme.colorScheme.primary, size: 32),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Sınıfa Katıl', 
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold, 
-                color: primaryColor
-              )
-            ),
-            const SizedBox(height: 20),
-
-            // Kod Giriş Alanı (SADECE 6 HANE)
+            const SizedBox(height: 24),
             TextField(
               controller: _codeController,
-              textAlign: TextAlign.center,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(6), // Tam 6 hane
-              ],
-              style: const TextStyle(fontSize: 24, letterSpacing: 5, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
-                hintText: '6 HANELİ KOD', 
-                hintStyle: const TextStyle(fontSize: 16, letterSpacing: 1),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                labelText: 'Sınıf Kodu',
+                hintText: 'Öğretmeninizden aldığınız kodu girin',
+                prefixIcon: const Icon(Icons.vpn_key_outlined),
                 filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                fillColor: theme.colorScheme.surface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: theme.dividerColor),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: primaryColor, width: 2),
+                  borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
                 ),
               ),
-              enabled: !_isLoading, 
             ),
-            
             const SizedBox(height: 24),
-
-            // --- ONAY BUTONLARI ---
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isLoading ? null : () => Navigator.pop(context), 
-                    style: OutlinedButton.styleFrom(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('İptal'),
+                    child: Text(
+                      'İptal',
+                      style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

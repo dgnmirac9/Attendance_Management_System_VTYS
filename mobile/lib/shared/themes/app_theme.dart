@@ -10,15 +10,15 @@ class AppTheme {
   static const Color _lightBackground = Color(0xFFD0E6FA); // Daha dolgun Mavi (Mavi 50'den daha güçlü)
   static const Color _lightSurface = Colors.white; // Kartlar
   static const Color _lightTextPrimary = Color(0xFF1565C0); // Mavi 800 (Koyu Mavi Yazı)
-  static const Color _lightBorder = Color(0xFFBBDEFB); // Mavi 100 (Pasif Çerçeve)
+
 
   // --- MAVİ PALET: KOYU TEMA RENKLERİ (Yüksek Kontrast) ---
   static const Color _darkPrimary = Color(0xFF64B5F6); // Mavi 300 (Koyu zeminde parlayan aksan)
   static const Color _darkBackground = Color(0xFF121212); // Klasik Koyu Zemin
   static const Color _darkSurface = Color(0xFF212121); // Kartlar
-  static const Color _darkInputFill = Color(0xFF2D3748); // Koyu temada input alanı dolgu
+
   static const Color _darkTextPrimary = Colors.white; // Yazı her zaman Beyaz
-  static const Color _darkBorder = Color(0xFF424242); // Koyu Gri Çerçeve
+
 
   // ===========================================================================
   // AÇIK TEMA (Light)
@@ -41,19 +41,6 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         titleTextStyle: TextStyle(color: _lightTextPrimary, fontSize: 20, fontWeight: FontWeight.bold),
-        iconTheme: IconThemeData(color: _lightTextPrimary),
-      ),
-
-      // Form Alanları
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: _lightSurface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _lightBorder)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _lightBorder, width: 1.5)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _lightPrimary, width: 2.5)),
-        labelStyle: TextStyle(color: _lightTextPrimary.withOpacity(0.7)),
-        prefixIconColor: _lightPrimary,
       ),
 
       // Butonlar
@@ -119,19 +106,6 @@ class AppTheme {
         iconTheme: IconThemeData(color: _darkTextPrimary),
       ),
 
-      // FIX: Form Alanları
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: _darkInputFill, // <-- DAHA AÇIK DOLGU RENGİ
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _darkBorder)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _darkBorder, width: 1.5)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_borderRadius), borderSide: const BorderSide(color: _darkPrimary, width: 2.5)),
-        labelStyle: TextStyle(color: _darkTextPrimary.withOpacity(0.7)),
-        prefixIconColor: _darkPrimary,
-      ),
-
-      // Butonlar
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: _darkPrimary,

@@ -26,11 +26,14 @@ class ClassSettingsBottomSheet extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Sınıf Adını Düzenle"),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: "Yeni Sınıf Adı",
-            border: OutlineInputBorder(),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.8,
+          child: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: "Yeni Sınıf Adı",
+              border: OutlineInputBorder(),
+            ),
           ),
         ),
         actions: [
@@ -49,7 +52,7 @@ class ClassSettingsBottomSheet extends StatelessWidget {
               if (context.mounted) {
                 if (error == null) {
                   SnackbarUtils.showSuccess(context, "Sınıf adı güncellendi.");
-                  Navigator.pop(context); // BottomSheet'i kapat (ekran yenilensin diye)
+                  // Navigator.pop(context); // BURASI HATALIYDI: Ekranı kapatıyordu, kaldırıldı.
                 } else {
                   SnackbarUtils.showError(context, error);
                 }
@@ -111,7 +114,7 @@ class ClassSettingsBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
+
     final errorColor = theme.colorScheme.error;
     final borderColor = theme.inputDecorationTheme.enabledBorder?.borderSide.color ?? Colors.grey.shade300;
 
@@ -124,19 +127,10 @@ class ClassSettingsBottomSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // --- BAŞLIK ---
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 24),
+          // --- 1. ÜST KISIM (BAŞLIK) ---
           Text(
             "Sınıf Ayarları",
-            style: theme.textTheme.headlineSmall?.copyWith(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -144,7 +138,7 @@ class ClassSettingsBottomSheet extends StatelessWidget {
           Text(
             className,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 32),
@@ -169,7 +163,7 @@ class ClassSettingsBottomSheet extends StatelessWidget {
             context: context,
             icon: isTeacher ? Icons.delete_forever : Icons.exit_to_app,
             title: isTeacher ? 'Sınıfı Sil' : 'Sınıftan Ayrıl',
-            borderColor: errorColor.withOpacity(0.3),
+            borderColor: errorColor.withValues(alpha: 0.3),
             iconColor: errorColor,
             textColor: errorColor,
             onTap: () {
@@ -206,7 +200,7 @@ class ClassSettingsBottomSheet extends StatelessWidget {
           border: Border.all(color: borderColor, width: 1.5),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
           ],
         ),
         child: Row(
@@ -214,7 +208,7 @@ class ClassSettingsBottomSheet extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: (iconColor ?? primary).withOpacity(0.1),
+                color: (iconColor ?? primary).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: iconColor ?? primary, size: 24),

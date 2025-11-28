@@ -174,7 +174,7 @@ class _TeacherAttendanceScreenState extends State<TeacherAttendanceScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 10,
                           spreadRadius: 5,
                         ),
@@ -227,7 +227,7 @@ class _TeacherAttendanceScreenState extends State<TeacherAttendanceScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.person_off, size: 60, color: Colors.grey.withOpacity(0.3)),
+                              Icon(Icons.person_off, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
                               const SizedBox(height: 10),
                               const Text("Henüz kimse katılmadı", style: TextStyle(color: Colors.grey)),
                             ],

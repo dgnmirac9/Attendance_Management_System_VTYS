@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../shared/utils/snackbar_utils.dart';
-import '../../../authentication/data/auth_service.dart';
+import 'package:c_lens_mobile/features/authentication/data/auth_service.dart';
 import '../widgets/qr_scanner_screen.dart';
 import '../widgets/class_settings_bottom_sheet.dart';
 import '../widgets/student_detail_dialog.dart';
@@ -37,6 +37,9 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTick
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); // FAB güncellemesi için
+    });
     _checkUserRole();
     _fetchTeacherName();
   }
@@ -78,9 +81,11 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTick
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             SliverAppBar(
-              expandedHeight: 220.0,
+              expandedHeight: 250.0,
               floating: false,
               pinned: true,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Collapsed durumda arkaplan rengi (Sayfa rengi)
+              surfaceTintColor: Colors.transparent, 
               leading: Container(
                 margin: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -93,51 +98,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTick
                 ),
               ),
               flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.only(left: 20, right: 160, bottom: 16),
-                centerTitle: false,
-                title: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      widget.className,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 22,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0, 2),
-                            blurRadius: 4.0,
-                            color: Colors.black45,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.person, size: 14, color: Colors.white70),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            _teacherName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                collapseMode: CollapseMode.pin,
                 background: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -177,9 +138,70 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTick
                       ),
                     ),
                     
+                    // BAŞLIK VE HOCA BİLGİSİ - SOL ALT
+                    Positioned(
+                      left: 20,
+                      right: 160, // Kopyala butonu için yer bırak
+                      bottom: 20, // TabBar artık ayrı olduğu için daha aşağı inebilir
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                            stream: _authService.getClassStream(widget.classCode),
+                            builder: (context, snapshot) {
+                              String displayName = widget.className;
+                              if (snapshot.hasData && snapshot.data!.exists) {
+                                final data = snapshot.data!.data();
+                                if (data != null && data.containsKey('name')) {
+                                  displayName = data['name'];
+                                }
+                              }
+                              return Text(
+                                displayName,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 22,
+                                  shadows: [
+                                    Shadow(
+                                      offset: Offset(0, 2),
+                                      blurRadius: 4.0,
+                                      color: Colors.black45,
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.person, size: 14, color: Colors.white70),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  _teacherName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
                     // KOPYALA BUTONU - SAĞ ALT KÖŞE
                     Positioned(
-                      bottom: 16,
+                      bottom: 20, 
                       right: 16,
                       child: Container(
                         decoration: BoxDecoration(
@@ -264,8 +286,8 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTick
                   indicatorWeight: 3,
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold),
                   tabs: const [
-                    Tab(icon: Icon(Icons.qr_code_scanner), text: "Yoklama"),
-                    Tab(icon: Icon(Icons.people), text: "Öğrenciler"),
+                    Tab(icon: Icon(Icons.dashboard_outlined), text: "Pano"),
+                    Tab(icon: Icon(Icons.people_outline), text: "Öğrenciler"),
                     Tab(icon: Icon(Icons.history), text: "Geçmiş"),
                   ],
                 ),
@@ -277,97 +299,256 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTick
         body: TabBarView(
           controller: _tabController,
           children: [
-            _buildAttendanceTab(context),
+            _buildAnnouncementsTab(context),
             _buildStudentsTab(context),
             _buildHistoryTab(context),
           ],
         ),
       ),
+      floatingActionButton: _buildFloatingActionButton(),
     );
   }
 
-  // --- 1. YOKLAMA SEKMESİ ---
-  Widget _buildAttendanceTab(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-                shape: BoxShape.circle,
-                border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.5), width: 2),
-              ),
-              child: Icon(
-                _isTeacher ? Icons.qr_code_2 : Icons.qr_code_scanner,
-                size: 80,
-                color: theme.colorScheme.primary,
-              ),
+  // --- 1. PANO (DUYURULAR) SEKMESİ ---
+  Widget _buildAnnouncementsTab(BuildContext context) {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _authService.getAnnouncements(widget.classCode),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final announcements = snapshot.data ?? [];
+
+        if (announcements.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.campaign_outlined, size: 64, color: Colors.grey.withValues(alpha: 0.5)),
+                const SizedBox(height: 16),
+                Text(
+                  "Henüz duyuru yok",
+                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                ),
+              ],
             ),
-            const SizedBox(height: 32),
-            Text(
-              _isTeacher ? "Yoklama Başlat" : "Yoklamaya Katıl",
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _isTeacher 
-                  ? "Ders için yeni bir QR kod oluşturun ve öğrencilerin taratmasını sağlayın."
-                  : "Öğretmeninizin tahtada gösterdiği QR kodu taratarak derse katılım sağlayın.",
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 48),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  if (_isTeacher) {
-                    // HOCA: Yoklama Ekranına Git
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TeacherAttendanceScreen(
-                          classCode: widget.classCode,
-                          className: widget.className,
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: announcements.length,
+          itemBuilder: (context, index) {
+            final announcement = announcements[index];
+            final date = (announcement['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+            final dateStr = "${date.day}.${date.month}.${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 16),
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            announcement['title'] ?? 'Başlıksız',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
                         ),
-                      ),
-                    );
-                  } else {
-                    // ÖĞRENCİ: Kamerayı Aç
-                    _handleStudentAttendance();
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                        if (_isTeacher)
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert),
+                            onSelected: (value) {
+                              if (value == 'delete') {
+                                _deleteAnnouncement(announcement['id']);
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, color: Colors.red, size: 20),
+                                    SizedBox(width: 8),
+                                    Text("Sil", style: TextStyle(color: Colors.red)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      announcement['content'] ?? '',
+                      style: const TextStyle(fontSize: 15, height: 1.4),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text(
+                          dateStr,
+                          style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteAnnouncement(String announcementId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Duyuruyu Sil"),
+        content: const Text("Bu duyuruyu silmek istediğinize emin misiniz?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("İptal")),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text("Sil"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _authService.deleteAnnouncement(widget.classCode, announcementId);
+      if (mounted) {
+        SnackbarUtils.showSuccess(context, "Duyuru silindi.");
+      }
+    }
+  }
+
+  void _showAddAnnouncementDialog() {
+    final titleController = TextEditingController();
+    final contentController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Yeni Duyuru"),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.8,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: "Başlık",
+                    border: OutlineInputBorder(),
                   ),
                 ),
-                icon: Icon(_isTeacher ? Icons.play_arrow : Icons.camera_alt),
-                label: Text(
-                  _isTeacher ? "OTURUMU BAŞLAT" : "KODU TARA",
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: contentController,
+                  decoration: const InputDecoration(
+                    labelText: "İçerik",
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 5,
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("İptal"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (titleController.text.isEmpty || contentController.text.isEmpty) {
+                SnackbarUtils.showError(context, "Lütfen tüm alanları doldurun.");
+                return;
+              }
+
+              Navigator.pop(context);
+              await _authService.createAnnouncement(
+                classCode: widget.classCode,
+                title: titleController.text,
+                content: contentController.text,
+                teacherUid: _currentUid,
+              );
+              if (context.mounted) {
+                SnackbarUtils.showSuccess(context, "Duyuru paylaşıldı.");
+              }
+            },
+            child: const Text("Paylaş"),
+          ),
+        ],
       ),
     );
   }
+
+  Widget? _buildFloatingActionButton() {
+    // 1. PANO SEKMESİ (Sadece Hoca Duyuru Ekler)
+    if (_tabController.index == 0) {
+      if (_isTeacher) {
+        return FloatingActionButton(
+          onPressed: _showAddAnnouncementDialog,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          shape: const CircleBorder(),
+          child: const Icon(Icons.add, size: 28),
+        );
+      }
+      return null;
+    }
+
+    // 2. ÖĞRENCİLER SEKMESİ (QR İşlemleri)
+    if (_tabController.index == 1) {
+      return FloatingActionButton(
+        onPressed: () {
+          if (_isTeacher) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TeacherAttendanceScreen(
+                  classCode: widget.classCode,
+                  className: widget.className,
+                ),
+              ),
+            );
+          } else {
+            _handleStudentAttendance();
+          }
+        },
+        backgroundColor: Theme.of(context).colorScheme.secondary,
+        foregroundColor: Theme.of(context).colorScheme.onSecondary,
+        shape: const CircleBorder(),
+        child: Icon(
+          _isTeacher ? Icons.qr_code_2 : Icons.qr_code_scanner,
+          size: 28,
+        ),
+      );
+    }
+
+    return null;
+  }
+
 
   // Öğrenci QR Tarama İşlemi
   Future<void> _handleStudentAttendance() async {
