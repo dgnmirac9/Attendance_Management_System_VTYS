@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'firebase_options.dart'; 
 import 'routes.dart';
 import 'shared/themes/app_theme.dart';
-import 'shared/themes/theme_manager.dart'; // Yeni oluşturduğumuz yönetici
+import 'shared/themes/theme_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 1. Kayıtlı Temayı Yükle
   await ThemeManager.loadTheme();
+
+  // 2. Tarih Formatını Başlat (Türkçe için)
+  await initializeDateFormatting('tr_TR', null);
 
   try {
     await Firebase.initializeApp(
