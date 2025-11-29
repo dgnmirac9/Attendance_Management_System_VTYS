@@ -1,5 +1,5 @@
-name: c_lens_mobile
-description: "A new Flutter project."
+name: attendance_management_system_vtys
+description: Firat universitesi yuz tanima ile yoklama sistemi
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
@@ -32,6 +32,7 @@ dependencies:
   shared_preferences: ^2.5.3
   mobile_scanner: 5.2.3
   firebase_auth: ^6.1.2
+  flutter_riverpod: ^2.6.1
 
 #  cupertino_icons: ^1.0.8
 #  toggle_switch: ^2.3.0

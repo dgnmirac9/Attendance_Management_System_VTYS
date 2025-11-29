@@ -1,4 +1,4 @@
-package com.example.c_lens_mobile
+package com.example.attendance_management_system_vtys
 
 import io.flutter.embedding.android.FlutterActivity
 
