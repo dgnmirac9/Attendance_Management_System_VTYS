@@ -1,23 +1,47 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../routes.dart' as app_routes;
 
-// Kendi oluşturduğumuz widget ve servisleri çağırıyoruz
 import '../widgets/home_empty_state.dart';
 import '../widgets/profile_menu_sheet.dart';
 import '../widgets/create_class_dialog.dart'; 
 import '../widgets/join_class_dialog.dart';
 import '../../../authentication/data/auth_service.dart';
+import 'class_details_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final String userRole;
-  // Hata Fix 1: '_authService' tanımlanırken 'const' keyword'ü kaldırıldı.
-  final AuthService _authService = AuthService(); 
 
-  // FIX: Constructor'da 'const' keyword'ü kaldırıldı.
-  HomeScreen({super.key, this.userRole = 'student'});
+  const HomeScreen({super.key, this.userRole = 'student'});
 
-  bool get isTeacher => userRole == 'teacher';
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final AuthService _authService = AuthService();
+  bool get isTeacher => widget.userRole == 'teacher';
+
+  List<Map<String, dynamic>> _localClasses = [];
+  bool _isClassesLoaded = false;
+  DateTime? _lastReorderTime;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  Future<void> _saveOrder() async {
+    if (_localClasses.isEmpty) return;
+    try {
+      List<String> newOrder = _localClasses.map((c) => c['code'] as String).toList();
+      await _authService.updateClassOrder(newOrder);
+    } catch (e) {
+      debugPrint("Sıralama kaydedilemedi: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,29 +57,24 @@ class HomeScreen extends StatelessWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // FIX 2: Renk erişimi hatalarını gidermek için, sadece withOpacity'ı kaldırdık
-    // ve renkleri doğrudan kullandık.
-    // %10 Şeffaflıkta Arka Plan Rengi
-    final profileBgColor = primaryColor.withAlpha(255 ~/ 10);
-    // %50 Şeffaflıkta Çerçeve Rengi
-    final profileBorderColor = primaryColor.withAlpha(255 ~/ 2); 
+    final profileBgColor = primaryColor.withValues(alpha: 0.1);
+    final profileBorderColor = primaryColor.withValues(alpha: 0.5); 
     
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sınıflarım'),
         actions: [
-          // --- PROFİL İKONU ---
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: InkWell(
               onTap: () => _showProfileMenu(context),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(50), 
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: profileBgColor, // FIX: Uyarı Giderildi
+                  color: profileBgColor,
                   shape: BoxShape.circle,
-                  border: Border.all(color: profileBorderColor, width: 1), // FIX: Uyarı Giderildi
+                  border: Border.all(color: profileBorderColor, width: 1),
                 ),
                 child: Icon(Icons.face, color: primaryColor, size: 24),
               ),
@@ -63,30 +82,177 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-
-      // --- GÖVDE: CANLI VERİ DİNLEYİCİSİ (StreamBuilder) ---
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _authService.getClassesStream(currentUser.uid, userRole),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _authService.getUserStream(currentUser.uid),
+        builder: (context, userSnapshot) {
+          if (userSnapshot.connectionState == ConnectionState.waiting && !_isClassesLoaded) {
             return const Center(child: CircularProgressIndicator());
           }
-          
-          if (snapshot.hasError) {
-            return Center(child: Text('Veri çekilirken hata oluştu: ${snapshot.error}'));
+
+          List<dynamic> classOrder = [];
+          if (userSnapshot.hasData && userSnapshot.data!.exists) {
+            classOrder = userSnapshot.data!.data()?['classOrder'] ?? [];
           }
 
-          final classes = snapshot.data ?? [];
+          return StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _authService.getClassesStream(currentUser.uid, widget.userRole),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text('Veri çekilirken hata oluştu: ${snapshot.error}'));
+              }
 
-          if (classes.isEmpty) {
-            return const HomeEmptyState();
-          }
+              if (snapshot.connectionState == ConnectionState.waiting && !_isClassesLoaded) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          return _buildClassesList(context, classes);
+              final classes = snapshot.data;
+
+              if (classes != null) {
+                // 1. Sunucu tarafındaki sıralamayı uygula (Eğer varsa)
+                if (classOrder.isNotEmpty) {
+                  classes.sort((a, b) {
+                    int indexA = classOrder.indexOf(a['code']);
+                    int indexB = classOrder.indexOf(b['code']);
+                    
+                    if (indexA == -1) indexA = 9999;
+                    if (indexB == -1) indexB = 9999;
+                    return indexA.compareTo(indexB);
+                  });
+                }
+
+                // 2. Akıllı Senkronizasyon Mantığı
+                bool structureChanged = false;
+                
+                // A. Yapısal Değişiklik Kontrolü (Ekleme/Silme)
+                if (!_isClassesLoaded || _localClasses.length != classes.length) {
+                  structureChanged = true;
+                } else {
+                  final localIds = _localClasses.map((c) => c['code']).toSet();
+                  final newIds = classes.map((c) => c['code']).toSet();
+                  if (localIds.length != newIds.length || !localIds.containsAll(newIds)) {
+                    structureChanged = true;
+                  }
+                }
+
+                if (structureChanged) {
+                  // Yapı değiştiyse (yeni sınıf geldi/gitti), her şeyi güncelle
+                  _localClasses = List.from(classes);
+                  _isClassesLoaded = true;
+                  Future.microtask(() {
+                    if (mounted) setState(() {});
+                  });
+                } else {
+                  // B. Veri ve Sıralama Kontrolü
+                  bool dataChanged = false;
+                  bool orderChanged = false;
+
+                  // Sıralama değişmiş mi?
+                  for (int i = 0; i < classes.length; i++) {
+                    if (_localClasses[i]['code'] != classes[i]['code']) {
+                      orderChanged = true;
+                      break;
+                    }
+                  }
+
+                  // Verileri yerinde güncelle (Sıralamayı bozmadan)
+                  for (var newClass in classes) {
+                    final index = _localClasses.indexWhere((c) => c['code'] == newClass['code']);
+                    if (index != -1) {
+                      final oldClass = _localClasses[index];
+                      if (oldClass['name'] != newClass['name'] || 
+                          oldClass['studentCount'] != newClass['studentCount'] ||
+                          oldClass['accentColor'] != newClass['accentColor']) {
+                        _localClasses[index] = newClass; // Veriyi güncelle, sırayı koru
+                        dataChanged = true;
+                      }
+                    }
+                  }
+
+                  // Sıralama güncelleme kararı
+                  if (orderChanged) {
+                    final now = DateTime.now();
+                    // Eğer son 3 saniye içinde yerel sıralama yaptıysak, sunucudan gelen eski sırayı yoksay
+                    bool recentlyReordered = _lastReorderTime != null && 
+                        now.difference(_lastReorderTime!).inSeconds < 3;
+                    
+                    if (!recentlyReordered) {
+                      _localClasses = List.from(classes);
+                      dataChanged = true; // Yeniden çizim tetikle
+                    }
+                  }
+
+                  if (dataChanged) {
+                    Future.microtask(() {
+                      if (mounted) setState(() {});
+                    });
+                  }
+                }
+              }
+
+              if (_localClasses.isEmpty) {
+                return const HomeEmptyState();
+              }
+
+              return ReorderableListView.builder(
+                padding: const EdgeInsets.all(16.0),
+                itemCount: _localClasses.length,
+                proxyDecorator: (child, index, animation) {
+                  return AnimatedBuilder(
+                    animation: animation,
+                    builder: (BuildContext context, Widget? child) {
+                      final double animValue = Curves.easeInOut.transform(animation.value);
+                      final double scale = lerpDouble(1, 1.05, animValue)!;
+                      final double angle = lerpDouble(0, -0.05, animValue)!; 
+                      
+                      return Transform.rotate(
+                        angle: angle,
+                        child: Transform.scale(
+                          scale: scale,
+                          child: Material(
+                            elevation: 8,
+                            color: Colors.transparent,
+                            shadowColor: Colors.black.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            child: child,
+                          ),
+                        ),
+                      );
+                    },
+                    child: child,
+                  );
+                },
+                onReorder: (oldIndex, newIndex) {
+                  setState(() {
+                    if (newIndex > oldIndex) {
+                      newIndex -= 1;
+                    }
+                    final item = _localClasses.removeAt(oldIndex);
+                    _localClasses.insert(newIndex, item);
+                    _lastReorderTime = DateTime.now();
+                    _saveOrder();
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final classData = _localClasses[index];
+                  final accentColor = Color(classData['accentColor'] ?? primaryColor.toARGB32());
+                  return Padding(
+                    key: ValueKey(classData['code']),
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: _buildClassCard(
+                      theme,
+                      accentColor,
+                      classData['name'] ?? 'İsimsiz Sınıf',
+                      classData['studentCount'] ?? 0,
+                      classData['code'] ?? '',
+                      classData['teacherUid'] ?? '',
+                    ),
+                  );
+                },
+              );
+            },
+          );
         },
       ),
-
-      // --- SAĞ ALT BUTON (FAB) ---
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           if (isTeacher) {
@@ -104,136 +270,82 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // --- SINIF LİSTESİ WIDGET'I (YENİ TASARIM) ---
-  Widget _buildClassesList(BuildContext context, List<Map<String, dynamic>> classes) {
-    final theme = Theme.of(context);
-    // Temanın ana rengini (primaryColor) kullanarak canlı bir vurgu rengi oluşturuyoruz
-    final accentColor = theme.colorScheme.primary; 
-    // Kartın arka plan rengini temaya uygun belirliyoruz (genellikle CardColor veya Surface)
-    final cardColor = theme.colorScheme.surface;
-    // Kartın gölgeli görünmesi için Container Elevation'u kullanıyoruz
-    const double cardElevation = 4;
-
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: ListView.builder(
-        itemCount: classes.length,
-        itemBuilder: (context, index) {
-          final classData = classes[index];
-          final studentCount = classData['studentUids']?.length ?? 0;
-          
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12.0),
-            child: InkWell(
-              onTap: () {
-                // Sınıf detay sayfasına gitme logic'i buraya gelecek
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: cardElevation,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                  // Sol tarafta tema renginde kalın bir çizgi (vurgu)
-                  border: Border(
-                    left: BorderSide(
-                      color: accentColor, 
-                      width: 6,
-                    ),
-                  ),
-                ),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // --- BAŞLIK (SINIF ADI) ---
-                    Text(
-                      classData['name'] ?? 'Bilinmeyen Sınıf',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: accentColor, // Başlık rengini tema rengi yapıyoruz
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // --- DETAYLAR ---
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // KOD
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'KOD:',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withOpacity(0.6),
-                              ),
-                            ),
-                            Text(
-                              classData['code'] ?? 'Yok',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        // ÖĞRENCİ SAYISI
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              'ÖĞRENCİ SAYISI:',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withOpacity(0.6),
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                Icon(Icons.people, size: 18, color: theme.colorScheme.secondary),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '$studentCount',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-
-                        // DURUM İKONU (Hoca veya Öğrenci)
-                        isTeacher
-                            ? Icon(Icons.school, color: accentColor, size: 30) // Hoca Simgesi
-                            : Icon(Icons.check_circle, color: Colors.green.shade600, size: 30), // Öğrenci Simgesi (Katıldı)
-                      ],
-                    ),
-                  ],
-                ),
+  Widget _buildClassCard(
+    ThemeData theme, 
+    Color accentColor, 
+    String className, 
+    int studentCount,
+    String classCode,
+    String teacherUid,
+  ) {
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ClassDetailsScreen(
+                className: className,
+                classCode: classCode,
+                teacherUid: teacherUid,
               ),
             ),
           );
         },
+        child: Container(
+          height: 120,
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: accentColor,
+                width: 6,
+              ),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  className,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: accentColor,
+                  ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.people, size: 20, color: theme.colorScheme.secondary),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$studentCount',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  // --- YARDIMCI FONKSİYONLAR ---
-
   void _showProfileMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
       builder: (context) => ProfileMenuSheet(isTeacher: isTeacher),
     );
   }

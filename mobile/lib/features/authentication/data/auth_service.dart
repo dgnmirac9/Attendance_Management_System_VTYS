@@ -7,6 +7,8 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  AuthService();
+
   // --- SINIF KODU ÜRETME (6 HANELİ BENZERSİZ ID) ---
   // Statik 6 haneli kalıcı kodu üretir
   Future<String> _generateUniqueClassCode() async {
@@ -35,11 +37,13 @@ class AuthService {
     required String lastName,
     required String role,
     String? studentNo,
+    List<List<double>>? faceEmbeddings, // YENİ: Yüz verileri
   }) async {
+    UserCredential? userCredential;
     try {
       debugPrint("🚀 1. Kayıt işlemi başladı...");
       
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -54,6 +58,7 @@ class AuthService {
         'uid': uid,
         'createdAt': FieldValue.serverTimestamp(),
         'studentNo': studentNo,
+        'faceEmbeddings': faceEmbeddings, // YENİ: Veritabanına kaydet
       });
 
       debugPrint("🎉 4. Veritabanına başarıyla kaydedildi!");
@@ -62,9 +67,15 @@ class AuthService {
       debugPrint("❌ Firebase Hatası: ${e.code}");
       if (e.code == 'email-already-in-use') return 'Bu e-posta adresi zaten kayıtlı.';
       if (e.code == 'weak-password') return 'Şifre çok zayıf (en az 6 karakter olmalı).';
+      if (e.code == 'network-request-failed') return 'İnternet bağlantısı yok. Lütfen ağ ayarlarınızı kontrol edin.';
       return "Kayıt Hatası: ${e.message}";
     } catch (e) {
       debugPrint("☠️ Genel Hata: $e");
+      // EĞER VERİTABANI KAYDI BAŞARISIZ OLURSA, KULLANICIYI SİL (ZOMBİ HESAP OLMASIN)
+      if (userCredential != null) {
+        await userCredential.user?.delete();
+        debugPrint("⚠️ Veritabanı hatası nedeniyle kullanıcı silindi.");
+      }
       return "Beklenmedik bir hata oluştu: $e";
     }
   }
@@ -76,6 +87,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+
     try {
       debugPrint("🚀 Giriş deneniyor: $email");
 
@@ -93,18 +105,22 @@ class AuthService {
         return userDoc.data() as Map<String, dynamic>;
       } else {
         debugPrint("⚠️ Giriş yapıldı ama veritabanında kaydı yok!");
-        return null;
+        throw Exception("Kullanıcı profili bulunamadı. Kayıt işlemi yarım kalmış olabilir.");
       }
 
     } on FirebaseAuthException catch (e) {
       debugPrint("❌ Giriş Hatası: ${e.code}");
-      return null; 
+      if (e.code == 'user-not-found') throw Exception("Kullanıcı bulunamadı.");
+      if (e.code == 'wrong-password') throw Exception("Şifre yanlış.");
+      if (e.code == 'invalid-credential') throw Exception("E-posta veya şifre hatalı.");
+      if (e.code == 'network-request-failed') throw Exception("İnternet bağlantısı yok. Lütfen ağ ayarlarınızı kontrol edin.");
+      throw Exception("Giriş Hatası: ${e.message}");
     } catch (e) {
       debugPrint("☠️ Genel Hata: $e");
-      return null;
+      throw Exception(e.toString().replaceAll("Exception: ", ""));
     }
   }
-  
+
   // ==================================================
   // 3. SINIF YÖNETİMİ FONKSİYONLARI
   // ==================================================
@@ -158,14 +174,47 @@ class AuthService {
       debugPrint("🎉 SINIF BAŞARIYLA KATILINDI!");
       return null;
 
-    } on FirebaseException catch (e) {
+    } on FirebaseException {
       return "Sınıfa katılma sırasında bir hata oluştu.";
     }
   }
 
-  // ==================================================
-  // 4. KULLANICI BİLGİSİ YÖNETİMİ
-  // ==================================================
+  // Sınıf Adını Güncelle (Hoca)
+  Future<String?> updateClassName(String classCode, String newName) async {
+    try {
+      await _firestore.collection('classes').doc(classCode).update({
+        'name': newName,
+      });
+      return null;
+    } catch (e) {
+      debugPrint("❌ Sınıf adı güncelleme hatası: $e");
+      return "Güncelleme başarısız oldu.";
+    }
+  }
+
+  // Sınıfı Sil (Hoca)
+  Future<String?> deleteClass(String classCode) async {
+    try {
+      await _firestore.collection('classes').doc(classCode).delete();
+      return null;
+    } catch (e) {
+      debugPrint("❌ Sınıf silme hatası: $e");
+      return "Silme işlemi başarısız oldu.";
+    }
+  }
+
+  // Sınıftan Ayrıl (Öğrenci)
+  Future<String?> leaveClass(String classCode, String studentUid) async {
+    try {
+      await _firestore.collection('classes').doc(classCode).update({
+        'studentUids': FieldValue.arrayRemove([studentUid]),
+      });
+      return null;
+    } catch (e) {
+      debugPrint("❌ Sınıftan ayrılma hatası: $e");
+      return "Ayrılma işlemi başarısız oldu.";
+    }
+  }
 
   Future<Map<String, dynamic>?> getUserData(String uid) async {
     try {
@@ -205,23 +254,26 @@ class AuthService {
       AuthCredential credential = EmailAuthProvider.credential(email: email, password: oldPassword);
       await user.reauthenticateWithCredential(credential);
       await user.updatePassword(newPassword);
-      debugPrint("🎉 Şifre başarıyla güncellendi!");
       return null;
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'wrong-password' || e.code == 'user-not-found') {
+      if (e.code == 'wrong-password' || e.code == 'user-not-found' || e.code == 'invalid-credential') {
         return "Mevcut şifreniz yanlış.";
       } else if (e.code == 'requires-recent-login') {
         return "Güvenlik nedeniyle tekrar giriş yapıp deneyin.";
       }
       return "Hata oluştu: ${e.message}";
     } catch (e) {
-      debugPrint("☠️ GENEL HATA: $e");
-      return "Beklenmedik bir hata oluştu.";
+      return "Bir hata oluştu: $e";
     }
   }
+
   // ==================================================
   // 5. CANLI SINIF LİSTESİNİ ÇEKME
   // ==================================================
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getClassStream(String classCode) {
+    return _firestore.collection('classes').doc(classCode).snapshots();
+  }
 
   Stream<List<Map<String, dynamic>>> getClassesStream(String uid, String role) {
     Query query;
@@ -241,17 +293,258 @@ class AuthService {
     // Sorguyu canlı dinleyen Stream'i döndür
     return query.snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
-        // Her dokümanı Map olarak döndür
-        return doc.data() as Map<String, dynamic>;
+        final data = doc.data() as Map<String, dynamic>;
+        // Öğrenci sayısını hesapla
+        final studentUids = data['studentUids'] as List<dynamic>? ?? [];
+        data['studentCount'] = studentUids.length;
+        return data;
       }).toList();
     });
   }
 
+  // 6.1. Yeni Yoklama Oturumu Başlat (Hoca)
+  Future<String?> startAttendanceSession(String classCode) async {
+    try {
+      final docRef = _firestore.collection('classes').doc(classCode).collection('attendance_sessions').doc();
+      
+      await docRef.set({
+        'sessionId': docRef.id,
+        'classCode': classCode,
+        'createdAt': FieldValue.serverTimestamp(),
+        'isActive': true,
+        'currentQrCode': '', // Başlangıçta boş, timer ile dolacak
+        'attendees': [], // Katılan öğrenci UID'leri
+      });
+
+      return docRef.id;
+    } catch (e) {
+      debugPrint("❌ Yoklama başlatma hatası: $e");
+      return null;
+    }
+  }
+
+  // 6.2. Oturumun QR Kodunu Güncelle (Hoca - Her 5-10 saniyede bir)
+  Future<void> updateSessionQrCode(String classCode, String sessionId, String newQrCode) async {
+    try {
+      await _firestore
+          .collection('classes')
+          .doc(classCode)
+          .collection('attendance_sessions')
+          .doc(sessionId)
+          .update({'currentQrCode': newQrCode});
+    } catch (e) {
+      debugPrint("❌ QR güncelleme hatası: $e");
+    }
+  }
+
+  // 6.3. Yoklamayı Bitir (Hoca)
+  Future<void> endAttendanceSession(String classCode, String sessionId) async {
+    try {
+      await _firestore
+          .collection('classes')
+          .doc(classCode)
+          .collection('attendance_sessions')
+          .doc(sessionId)
+          .update({'isActive': false, 'currentQrCode': ''});
+    } catch (e) {
+      debugPrint("❌ Yoklama bitirme hatası: $e");
+    }
+  }
+
+  // 6.4. Yoklamaya Katıl (Öğrenci)
+  Future<String?> joinAttendance(String classCode, String scannedQrCode, String studentUid) async {
+    try {
+      // 1. Aktif oturumu bul
+      final sessionQuery = await _firestore
+          .collection('classes')
+          .doc(classCode)
+          .collection('attendance_sessions')
+          .where('isActive', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (sessionQuery.docs.isEmpty) {
+        return "Şu an aktif bir yoklama yok.";
+      }
+
+      final sessionDoc = sessionQuery.docs.first;
+      final currentValidCode = sessionDoc['currentQrCode'];
+
+      // 2. QR Kod Kontrolü
+      if (currentValidCode != scannedQrCode) {
+        return "Geçersiz veya süresi dolmuş QR kod.";
+      }
+
+      // 3. Zaten katılmış mı?
+      List<dynamic> attendees = sessionDoc['attendees'] ?? [];
+      if (attendees.contains(studentUid)) {
+        return "Zaten yoklamaya katıldınız.";
+      }
+
+      // 4. Listeye ekle
+      await sessionDoc.reference.update({
+        'attendees': FieldValue.arrayUnion([studentUid])
+      });
+
+      return null; // Başarılı
+    } catch (e) {
+      debugPrint("❌ Yoklamaya katılma hatası: $e");
+      return "Bir hata oluştu: $e";
+    }
+  }
+
+  // 6.5. Sınıftaki Öğrencileri Getir (Detaylı)
+  Stream<List<Map<String, dynamic>>> getClassStudents(String classCode) {
+    return _firestore.collection('classes').doc(classCode).snapshots().asyncMap((classDoc) async {
+      if (!classDoc.exists) return [];
+      
+      List<dynamic> studentUids = classDoc['studentUids'] ?? [];
+      if (studentUids.isEmpty) return [];
+
+      // UID listesinden kullanıcı detaylarını çek
+      List<Map<String, dynamic>> students = [];
+      for (String uid in studentUids) {
+        final userDoc = await _firestore.collection('users').doc(uid).get();
+        if (userDoc.exists) {
+          students.add(userDoc.data() as Map<String, dynamic>);
+        }
+      }
+      return students;
+    });
+  }
+
+  // 6.6. Yoklama Geçmişini Getir
+  Stream<List<Map<String, dynamic>>> getAttendanceHistory(String classCode) {
+    return _firestore
+        .collection('classes')
+        .doc(classCode)
+        .collection('attendance_sessions')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => doc.data()).toList();
+    });
+  }
+
+  // 6.7. Yoklama Oturumunu Sil (Hoca)
+  Future<void> deleteAttendanceSession(String classCode, String sessionId) async {
+    try {
+      await _firestore
+          .collection('classes')
+          .doc(classCode)
+          .collection('attendance_sessions')
+          .doc(sessionId)
+          .delete();
+      debugPrint("🗑️ Yoklama oturumu silindi: $sessionId");
+    } catch (e) {
+      debugPrint("❌ Yoklama silme hatası: $e");
+      rethrow;
+    }
+  }
+
+  // 6.8. UID Listesinden Kullanıcı Detaylarını Getir (Toplu)
+  Future<List<Map<String, dynamic>>> getUsersByIds(List<String> uids) async {
+    if (uids.isEmpty) return [];
+    List<Map<String, dynamic>> users = [];
+    
+    for (String uid in uids) {
+      try {
+        final doc = await _firestore.collection('users').doc(uid).get();
+        if (doc.exists) {
+          users.add(doc.data() as Map<String, dynamic>);
+        }
+      } catch (e) {
+        debugPrint("Kullanıcı çekilemedi: $uid");
+      }
+    }
+    return users;
+  }
+
   // ==================================================
-  // 6. ÇIKIŞ YAPMA (SIGN OUT)
+  // 8. DUYURU YÖNETİMİ (ANNOUNCEMENTS)
+  // ==================================================
+
+  // 8.1. Duyuru Oluştur (Hoca)
+  Future<void> createAnnouncement({
+    required String classCode,
+    required String title,
+    required String content,
+    required String teacherUid,
+  }) async {
+    try {
+      await _firestore
+          .collection('classes')
+          .doc(classCode)
+          .collection('announcements')
+          .add({
+        'title': title,
+        'content': content,
+        'teacherUid': teacherUid,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      debugPrint("📢 Duyuru oluşturuldu: $title");
+    } catch (e) {
+      debugPrint("❌ Duyuru oluşturma hatası: $e");
+      rethrow;
+    }
+  }
+
+  // 8.2. Duyuruları Getir (Canlı Stream)
+  Stream<List<Map<String, dynamic>>> getAnnouncements(String classCode) {
+    return _firestore
+        .collection('classes')
+        .doc(classCode)
+        .collection('announcements')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id; // ID'yi de ekle
+        return data;
+      }).toList();
+    });
+  }
+
+  // 8.3. Duyuru Sil (Hoca)
+  Future<void> deleteAnnouncement(String classCode, String announcementId) async {
+    try {
+      await _firestore
+          .collection('classes')
+          .doc(classCode)
+          .collection('announcements')
+          .doc(announcementId)
+          .delete();
+      debugPrint("🗑️ Duyuru silindi: $announcementId");
+    } catch (e) {
+      debugPrint("❌ Duyuru silme hatası: $e");
+      rethrow;
+    }
+  }
+
+  // ==================================================
+  // 9. ÇIKIŞ YAPMA (SIGN OUT)
   // ==================================================
   Future<void> signOut() async {
     await _auth.signOut();
-    debugPrint("👋 Çıkış yapıldı.");
+    debugPrint(" Çıkış yapıldı.");
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getUserStream(String uid) {
+    return _firestore.collection('users').doc(uid).snapshots();
+  }
+
+  // Kullanıcının sınıf sıralamasını güncelle
+  Future<void> updateClassOrder(List<String> classCodes) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'classOrder': classCodes,
+      });
+    } catch (e) {
+      debugPrint("❌ Sınıf sıralaması güncellenemedi: $e");
+    }
   }
 }

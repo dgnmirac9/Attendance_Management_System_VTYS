@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'features/authentication/presentation/screens/login_screen.dart';
 import 'features/authentication/presentation/screens/register_screen.dart';
+import 'features/authentication/presentation/screens/splash_screen.dart';
 import 'features/faceauth/presentation/face_capture_screen.dart';
 import 'features/home/presentation/screens/home_screen.dart';
 
 class Routes {
-  static const String login = '/';
+  static const String splash = '/';
+  static const String login = '/login';
   static const String register = '/register';
   static const String faceCapture = '/face-capture';
   static const String home = '/home';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case splash:
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
       case register:

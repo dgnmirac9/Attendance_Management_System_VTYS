@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:c_lens_mobile/features/authentication/data/auth_service.dart';
 import '../../../../shared/utils/validators.dart';
-import '../../data/auth_service.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // UID için
-import 'package:cloud_firestore/cloud_firestore.dart'; // Veri modeli için (optional)
-import '../widgets/change_password_dialog.dart'; // Şifre değiştirme dialogu için
+import '../widgets/change_password_dialog.dart';
+import '../../../../shared/utils/snackbar_utils.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -22,7 +22,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController _studentNoController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
 
-  Map<String, dynamic>? _userData;
+  // Değişiklik kontrolü için ilk değerler
+  String _initialFirstName = '';
+  String _initialLastName = '';
+  String _initialStudentNo = '';
+
   bool _isLoading = true;
   String? _userRole; // Rolü tutacağız
 
@@ -30,6 +34,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _fetchUserData();
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _studentNoController.dispose();
+    _emailController.dispose();
+    super.dispose();
   }
 
   // --- MEVCUT VERİYİ FIREBASE'DEN ÇEKME FONKSİYONU ---
@@ -45,14 +58,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (mounted) {
       setState(() {
-        _userData = userMap;
+
         _isLoading = false;
         if (userMap != null) {
           _userRole = userMap['role'];
-          _firstNameController.text = userMap['firstName'] ?? '';
-          _lastNameController.text = userMap['lastName'] ?? '';
+          _initialFirstName = userMap['firstName'] ?? '';
+          _initialLastName = userMap['lastName'] ?? '';
+          _initialStudentNo = userMap['studentNo'] ?? '';
+
+          _firstNameController.text = _initialFirstName;
+          _lastNameController.text = _initialLastName;
           _emailController.text = userMap['email'] ?? '';
-          _studentNoController.text = userMap['studentNo'] ?? '';
+          _studentNoController.text = _initialStudentNo;
         }
       });
     }
@@ -61,6 +78,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // --- VERİYİ FIREBASE'DE GÜNCELLEME FONKSİYONU ---
   void _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Değişiklik kontrolü
+    bool hasChanges = _firstNameController.text.trim() != _initialFirstName ||
+        _lastNameController.text.trim() != _initialLastName;
+
+    if (_userRole == 'student') {
+      if (_studentNoController.text.trim() != _initialStudentNo) {
+        hasChanges = true;
+      }
+    }
+
+    if (!hasChanges) {
+      SnackbarUtils.showInfo(context, 'Herhangi bir değişiklik yapılmadı.');
+      return;
+    }
     
     setState(() => _isLoading = true);
 
@@ -75,20 +107,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_userRole == 'student') {
       dataToUpdate['studentNo'] = _studentNoController.text.trim();
     }
-    
-    String? error = await _authService.updateUserData(dataToUpdate);
+
+    final error = await _authService.updateUserData(dataToUpdate);
 
     if (mounted) {
       setState(() => _isLoading = false);
       if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profil başarıyla güncellendi!')),
-        );
-        Navigator.pop(context); // Geri dön
+        SnackbarUtils.showSuccess(context, 'Profil başarıyla güncellendi!');
+        // Başarılı güncelleme sonrası ilk değerleri güncelle
+        _initialFirstName = _firstNameController.text.trim();
+        _initialLastName = _lastNameController.text.trim();
+        if (_userRole == 'student') {
+          _initialStudentNo = _studentNoController.text.trim();
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $error'), backgroundColor: Colors.red),
-        );
+        SnackbarUtils.showError(context, error);
       }
     }
   }
@@ -98,7 +131,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    
+
     final theme = Theme.of(context);
     final isStudent = _userRole == 'student';
 
@@ -139,16 +172,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               // E-posta (Okunur ama düzenlenemez yapıyoruz, güvenlik için)
               TextFormField(
                 controller: _emailController,
-                readOnly: true, // E-posta değiştirilemesin
-                decoration: InputDecoration(
-                  labelText: 'E-posta (Değiştirilemez)', 
-                  prefixIcon: const Icon(Icons.email),
-                  fillColor: theme.inputDecorationTheme.fillColor?.withOpacity(0.5),
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'E-posta', 
+                  prefixIcon: Icon(Icons.email),
+                  helperText: 'E-posta adresi değiştirilemez.',
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Öğrenci No Alanı (Sadece öğrenci ise görünür)
+              // Öğrenci Numarası (Sadece Öğrenciler İçin)
               if (isStudent) ...[
                 TextFormField(
                   controller: _studentNoController,

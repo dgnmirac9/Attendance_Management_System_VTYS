@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../../shared/utils/validators.dart';
-import '../../../../routes.dart' as app_routes;
-// Tema dosyasını çağırmayı unutmuşsun, onu da ekliyoruz
-import '../../../../shared/themes/app_theme.dart'; 
-// Servis dosyamızı çağırıyoruz
 import '../../data/auth_service.dart'; 
+import '../../../faceauth/presentation/face_capture_screen.dart'; 
+import '../../../../core/face/image_preprocessor.dart'; 
+import '../../../../core/face/face_embedding_extractor.dart'; 
+import '../../../../shared/utils/snackbar_utils.dart';
+import 'dart:io'; 
 
 class RegisterForm extends StatefulWidget {
   const RegisterForm({super.key});
@@ -15,7 +16,7 @@ class RegisterForm extends StatefulWidget {
 
 class _RegisterFormState extends State<RegisterForm> {
   final _formKey = GlobalKey<FormState>();
-  final AuthService _authService = AuthService(); // Yeni servis nesnesi
+  final AuthService _authService = AuthService(); 
 
   // Controller'lar
   final TextEditingController _firstNameController = TextEditingController();
@@ -29,7 +30,11 @@ class _RegisterFormState extends State<RegisterForm> {
   bool _isStudent = false;
   bool _obscurePassword = true; 
   bool _obscureConfirmPassword = true; 
-  bool _isLoading = false; // YENİ: Yükleniyor durumu
+  bool _isLoading = false; 
+  
+  // Yüz Verileri
+  List<List<double>> _faceEmbeddings = []; 
+  final FaceEmbeddingExtractor _extractor = FaceEmbeddingExtractor(); 
 
   @override
   void dispose() {
@@ -42,7 +47,50 @@ class _RegisterFormState extends State<RegisterForm> {
     super.dispose();
   }
 
-  // --- KAYIT OLMA FONKSİYONU (GÜNCELLENDİ) ---
+  // --- YÜZ VERİSİ EKLEME FONKSİYONU ---
+  Future<void> _captureFaceData() async {
+    // 1. Kamera ekranını aç ve resim yollarını bekle
+    final List<String>? capturedImages = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const FaceCaptureScreen()),
+    );
+
+    if (capturedImages != null && capturedImages.isNotEmpty) {
+      setState(() => _isLoading = true); 
+      
+      try {
+        List<List<double>> newEmbeddings = [];
+
+        // 2. Her resim için embedding üret
+        for (String path in capturedImages) {
+          final File imageFile = File(path);
+          // a. Resmi işle (resize)
+          final processedImage = ImagePreprocessor.preprocess(imageFile);
+          // b. Embedding çıkar
+          final embedding = _extractor.run(processedImage);
+          // c. Listeye ekle
+          newEmbeddings.add(embedding.values);
+        }
+
+        // 3. State'i güncelle
+        setState(() {
+          _faceEmbeddings = newEmbeddings;
+        });
+
+        if (!mounted) return;
+        SnackbarUtils.showSuccess(context, '${newEmbeddings.length} adet yüz verisi başarıyla alındı!');
+
+      } catch (e) {
+        debugPrint("Yüz işleme hatası: $e");
+        if (!mounted) return;
+        SnackbarUtils.showError(context, 'Yüz verisi işlenirken hata oluştu: $e');
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // --- KAYIT OLMA FONKSİYONU ---
   void _handleRegister() async {
     // 1. Şifrelerin uyuşup uyuşmadığını kontrol eden form doğrulaması
     if (_formKey.currentState!.validate()) {
@@ -55,7 +103,8 @@ class _RegisterFormState extends State<RegisterForm> {
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         role: _isStudent ? 'student' : 'teacher',
-        studentNo: _studentNoController.text.trim(), // YENİ ALANI GÖNDERİYORUZ
+        studentNo: _studentNoController.text.trim(), 
+        faceEmbeddings: _isStudent ? _faceEmbeddings : null, 
       );
 
       // İşlem bitti, yükleniyor çarkını durdur
@@ -64,17 +113,13 @@ class _RegisterFormState extends State<RegisterForm> {
       if (error == null) {
         // BAŞARILI!
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kayıt Başarılı! Giriş yapabilirsiniz.'), backgroundColor: Colors.green),
-        );
+        SnackbarUtils.showSuccess(context, 'Kayıt Başarılı! Giriş yapabilirsiniz.');
         // Giriş ekranına geri at
         Navigator.pop(context); 
       } else {
         // HATA VAR
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("HATA: $error"), backgroundColor: Colors.red),
-        );
+        SnackbarUtils.showError(context, "HATA: $error");
       }
     }
   }
@@ -219,11 +264,9 @@ class _RegisterFormState extends State<RegisterForm> {
                       
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
-                        onPressed: () {
-                           // Yüz verisi ekleme logic'i buraya gelecek
-                        },
+                        onPressed: _captureFaceData, 
                         icon: const Icon(Icons.face),
-                        label: const Text('Yüz Verisi Ekle (0/5)'),
+                        label: Text('Yüz Verisi Ekle (${_faceEmbeddings.length}/5)'), 
                       ),
                     ],
 
@@ -231,7 +274,7 @@ class _RegisterFormState extends State<RegisterForm> {
                     
                     // KAYIT OL BUTONU
                     ElevatedButton(
-                      onPressed: _isLoading ? null : _handleRegister, // Firebase logic'i çağır
+                      onPressed: _isLoading ? null : _handleRegister, 
                       child: _isLoading 
                         ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white))
                         : const Text('Kayıt Ol'),

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; 
-import '../../../../shared/utils/validators.dart'; // validateRequired fonksiyonu için
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../../../authentication/data/auth_service.dart';
+import '../../../../shared/utils/snackbar_utils.dart';
 
 class CreateClassDialog extends StatefulWidget {
   const CreateClassDialog({super.key});
@@ -42,73 +43,98 @@ class _CreateClassDialogState extends State<CreateClassDialog> {
     if (result != null && !result.startsWith('Hata')) { 
       if (mounted) {
         Navigator.pop(context); // Diyaloğu kapat
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sınıf başarıyla oluşturuldu! Sınıf Kodunuz: $result'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 5), // Kodu rahat okuması için süreyi uzattık
-          ),
-        );
+        SnackbarUtils.showSuccess(context, 'Sınıf başarıyla oluşturuldu! Sınıf Kodunuz: $result');
       }
     } else {
       if (mounted) {
-        // Hata durumunda result bir String ("Hata: ...") döndürecektir.
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result ?? 'Bilinmeyen bir hata oluştu.'), backgroundColor: Colors.red),
-        );
+        SnackbarUtils.showError(context, result ?? 'Bilinmeyen bir hata oluştu.');
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final theme = Theme.of(context);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Yeni Sınıf Oluştur', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor, fontSize: 20)),
-            const SizedBox(height: 24),
-            
-            Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  // Sınıf Adı
-                  TextFormField(
-                    controller: _classNameController,
-                    decoration: const InputDecoration(labelText: 'Sınıf Adı', prefixIcon: Icon(Icons.school)),
-                    validator: (val) => validateRequired(val, fieldName: 'Sınıf Adı'),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.school, color: theme.colorScheme.primary, size: 32),
+              ),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _classNameController,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Sınıf adı boş olamaz';
+                  }
+                  return null;
+                },
+                decoration: InputDecoration(
+                  labelText: 'Sınıf Adı',
+                  hintText: 'Örn: Veri Tabanı Yönetim Sistemleri',
+                  prefixIcon: const Icon(Icons.class_outlined),
+                  filled: true,
+                  fillColor: theme.colorScheme.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: theme.dividerColor),
                   ),
-                  const SizedBox(height: 16),
-                  
-                  // Bilgilendirme Notu
-                  const Text(
-                    'Sınıf kodu otomatik olarak 6 haneli ve benzersiz şekilde üretilecektir.',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                    textAlign: TextAlign.center,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: theme.dividerColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        'İptal',
+                        style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleCreateClass,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: _isLoading 
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('Oluştur'),
+                    ),
                   ),
                 ],
               ),
-            ),
-            
-            const SizedBox(height: 32),
-            
-            // OLUŞTUR BUTONU
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _handleCreateClass,
-                child: _isLoading 
-                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('Sınıfı Oluştur'),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

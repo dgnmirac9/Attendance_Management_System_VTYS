@@ -13,7 +13,7 @@ class CustomTransparentAppBar extends StatelessWidget implements PreferredSizeWi
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
     // Yarı şeffaf arka plan rengi
-    final surfaceColor = theme.colorScheme.surface.withOpacity(0.85); 
+    final surfaceColor = theme.colorScheme.surface.withValues(alpha: 0.85); 
     
     // Uygulama genelindeki geri tuşu mantığını kullanmak için IconButton yerine BackButton kullanıyoruz.
     

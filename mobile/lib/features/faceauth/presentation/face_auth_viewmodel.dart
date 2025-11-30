@@ -1,25 +1,54 @@
-/**
- * FaceAuthViewModel
- *
- * Bu ViewModel kameradan alınan görüntüyü core katmanına (model → embedding) aktarır.
- * Burada "yüzün ne olduğu" bilinmez, sadece embedding üretimi yapılır.
- *
- * Üretilen embedding UI tarafından dinlenir → Signup veya Login ViewModel’e aktarılır.
- */
 
-import 'dart:io';
-import 'package:flutter/foundation.dart';
-import '../../../core/face/image_preprocessor.dart';
-import '../../../core/face/face_embedding_extractor.dart';
-import 'package:c_lens_mobile/features/faceauth/domain/face_embedding.dart';
+import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:image/image.dart' as img;
+import '../../../../core/face/face_embedding_extractor.dart';
+import '../../../../core/face/image_preprocessor.dart';
+import '../domain/face_embedding.dart';
 
 class FaceAuthViewModel extends ChangeNotifier {
-  final FaceEmbeddingExtractor extractor = FaceEmbeddingExtractor();
-  FaceEmbedding? embedding;
+  final FaceEmbeddingExtractor _extractor = FaceEmbeddingExtractor();
+  final ImagePreprocessor _preprocessor = ImagePreprocessor();
 
-  void onImageCaptured(File file) {
-    final processed = ImagePreprocessor.preprocess(file);
-    embedding = extractor.run(processed);
+  bool _isProcessing = false;
+  bool get isProcessing => _isProcessing;
+
+  String? _error;
+  String? get error => _error;
+
+  FaceEmbedding? _lastEmbedding;
+  FaceEmbedding? get lastEmbedding => _lastEmbedding;
+
+  /// Kameradan gelen görüntüyü işler ve embedding üretir
+  Future<void> processImage(CameraImage cameraImage) async {
+    if (_isProcessing) return;
+    _isProcessing = true;
+    _error = null;
     notifyListeners();
+
+    try {
+      // 1. Yüz Tespiti & Kırpma (Burada basitleştirildi, tüm ekranı alıyoruz)
+      // Gerçek senaryoda: Google ML Kit Face Detection ile yüz koordinatları bulunur.
+      
+      // 2. Ön İşleme (YUV -> RGB -> Resize 112x112)
+      final img.Image processedImage = _preprocessor.processCameraImage(cameraImage);
+
+      // 3. Embedding Çıkarma
+      final embedding = _extractor.run(processedImage);
+      _lastEmbedding = embedding;
+
+    } catch (e) {
+      _error = "Yüz işleme hatası: $e";
+      debugPrint(_error);
+    } finally {
+      _isProcessing = false;
+      notifyListeners();
+    }
+  }
+
+  /// İki yüzü karşılaştırır (Login senaryosu)
+  bool verifyFace(FaceEmbedding storedEmbedding) {
+    if (_lastEmbedding == null) return false;
+    return _lastEmbedding!.matches(storedEmbedding);
   }
 }
