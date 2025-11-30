@@ -22,6 +22,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController _studentNoController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
 
+  // Değişiklik kontrolü için ilk değerler
+  String _initialFirstName = '';
+  String _initialLastName = '';
+  String _initialStudentNo = '';
 
   bool _isLoading = true;
   String? _userRole; // Rolü tutacağız
@@ -58,10 +62,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _isLoading = false;
         if (userMap != null) {
           _userRole = userMap['role'];
-          _firstNameController.text = userMap['firstName'] ?? '';
-          _lastNameController.text = userMap['lastName'] ?? '';
+          _initialFirstName = userMap['firstName'] ?? '';
+          _initialLastName = userMap['lastName'] ?? '';
+          _initialStudentNo = userMap['studentNo'] ?? '';
+
+          _firstNameController.text = _initialFirstName;
+          _lastNameController.text = _initialLastName;
           _emailController.text = userMap['email'] ?? '';
-          _studentNoController.text = userMap['studentNo'] ?? '';
+          _studentNoController.text = _initialStudentNo;
         }
       });
     }
@@ -70,6 +78,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // --- VERİYİ FIREBASE'DE GÜNCELLEME FONKSİYONU ---
   void _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Değişiklik kontrolü
+    bool hasChanges = _firstNameController.text.trim() != _initialFirstName ||
+        _lastNameController.text.trim() != _initialLastName;
+
+    if (_userRole == 'student') {
+      if (_studentNoController.text.trim() != _initialStudentNo) {
+        hasChanges = true;
+      }
+    }
+
+    if (!hasChanges) {
+      SnackbarUtils.showInfo(context, 'Herhangi bir değişiklik yapılmadı.');
+      return;
+    }
     
     setState(() => _isLoading = true);
 
@@ -91,7 +114,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       setState(() => _isLoading = false);
       if (error == null) {
         SnackbarUtils.showSuccess(context, 'Profil başarıyla güncellendi!');
-        // Sayfada kalmaya devam ediyoruz, çıkış yapmıyoruz.
+        // Başarılı güncelleme sonrası ilk değerleri güncelle
+        _initialFirstName = _firstNameController.text.trim();
+        _initialLastName = _lastNameController.text.trim();
+        if (_userRole == 'student') {
+          _initialStudentNo = _studentNoController.text.trim();
+        }
       } else {
         SnackbarUtils.showError(context, error);
       }

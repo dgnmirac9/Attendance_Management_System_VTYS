@@ -161,7 +161,7 @@ class ClassSettingsBottomSheet extends StatelessWidget {
           // Sınıftan Ayrıl / Sil
           _buildMenuOption(
             context: context,
-            icon: isTeacher ? Icons.delete_forever : Icons.exit_to_app,
+            icon: isTeacher ? Icons.delete_outline : Icons.exit_to_app,
             title: isTeacher ? 'Sınıfı Sil' : 'Sınıftan Ayrıl',
             borderColor: errorColor.withValues(alpha: 0.3),
             iconColor: errorColor,

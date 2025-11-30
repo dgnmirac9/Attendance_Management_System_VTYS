@@ -27,133 +27,119 @@ class ProfileMenuSheet extends StatelessWidget {
         color: backgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // --- 1. ÜST KISIM (PROFİL KARTI & TEMA AYARI) ---
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                // Profil Resmi
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // --- 1. ÜST KISIM (PROFİL KARTI & TEMA AYARI) ---
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  // Profil Resmi
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: Icon(Icons.face, size: 40, color: primaryColor),
                   ),
-                  child: Icon(Icons.face, size: 40, color: primaryColor),
-                ),
-                const SizedBox(width: 16),
-                
-                // İsim ve Rol
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isTeacher ? "Öğretim Görevlisi" : "Öğrenci",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDarkMode ? Colors.white : const Color(0xFF1565C0), // Blue 800
+                  const SizedBox(width: 16),
+                  
+                  // İsim ve Rol
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isTeacher ? "Öğretim Görevlisi" : "Öğrenci",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode ? Colors.white : const Color(0xFF1565C0), // Blue 800
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        isTeacher ? "Hoca Paneli" : "Öğrenci Paneli",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDarkMode ? Colors.white70 : const Color(0xFF1976D2).withValues(alpha: 0.7), // Blue 700
+                        const SizedBox(height: 4),
+                        Text(
+                          isTeacher ? "Hoca Paneli" : "Öğrenci Paneli",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDarkMode ? Colors.white70 : const Color(0xFF1976D2).withValues(alpha: 0.7), // Blue 700
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
 
-                // Tema Değiştirme Switch'i
-                Container(
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey[800] : Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Switch(
+                  // Tema Değiştirme Switch'i
+                  _CustomThemeSwitch(
                     value: isDarkMode,
-                    activeTrackColor: Colors.grey,
-                    activeThumbColor: Colors.white,
-                    inactiveThumbColor: Colors.grey,
-                    trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-                    thumbIcon: WidgetStateProperty.resolveWith<Icon?>((states) {
-                      if (states.contains(WidgetState.selected)) {
-                        return const Icon(Icons.nightlight_round, color: Colors.black);
-                      }
-                      return const Icon(Icons.wb_sunny, color: Colors.orange);
-                    }),
                     onChanged: (value) {
                       ThemeManager.toggleTheme(value);
                     },
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          const SizedBox(height: 32),
+            const SizedBox(height: 32),
 
-          // --- MENÜ SEÇENEKLERİ ---
-          _buildMenuOption(
-            context: context,
-            icon: Icons.edit,
-            title: 'Bilgilerimi Düzenle',
-            backgroundColor: menuButtonColor,
-            iconColor: const Color(0xFF1976D2), // Blue 700
-            textColor: const Color(0xFF0D47A1), // Blue 900
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
-            },
-          ),
-
-          if (!isTeacher) ...[
-            const SizedBox(height: 16),
+            // --- MENÜ SEÇENEKLERİ ---
             _buildMenuOption(
               context: context,
-              icon: Icons.face_retouching_natural,
-              title: 'Yüz Verisini Güncelle',
+              icon: Icons.edit,
+              title: 'Bilgilerimi Düzenle',
               backgroundColor: menuButtonColor,
-              iconColor: const Color(0xFF1976D2),
-              textColor: const Color(0xFF0D47A1),
+              iconColor: const Color(0xFF1976D2), // Blue 700
+              textColor: const Color(0xFF0D47A1), // Blue 900
               onTap: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, app_routes.Routes.faceCapture);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
               },
             ),
+
+            if (!isTeacher) ...[
+              const SizedBox(height: 16),
+              _buildMenuOption(
+                context: context,
+                icon: Icons.face_retouching_natural,
+                title: 'Yüz Verisini Güncelle',
+                backgroundColor: menuButtonColor,
+                iconColor: const Color(0xFF1976D2),
+                textColor: const Color(0xFF0D47A1),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, app_routes.Routes.faceCapture);
+                },
+              ),
+            ],
+
+            const SizedBox(height: 16),
+
+            _buildMenuOption(
+              context: context,
+              icon: Icons.logout_rounded,
+              title: 'Çıkış Yap',
+              backgroundColor: menuButtonColor, // Screenshot'ta beyaz görünüyor, kırmızı border var
+              iconColor: const Color(0xFFD32F2F), // Red 700
+              textColor: const Color(0xFFC62828), // Red 800
+              isLogout: true,
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamedAndRemoveUntil(
+                    context, app_routes.Routes.login, (route) => false);
+              },
+            ),
+            
+            const SizedBox(height: 16),
           ],
-
-          const SizedBox(height: 16),
-
-          _buildMenuOption(
-            context: context,
-            icon: Icons.logout_rounded,
-            title: 'Çıkış Yap',
-            backgroundColor: menuButtonColor, // Screenshot'ta beyaz görünüyor, kırmızı border var
-            iconColor: const Color(0xFFD32F2F), // Red 700
-            textColor: const Color(0xFFC62828), // Red 800
-            isLogout: true,
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushNamedAndRemoveUntil(
-                  context, app_routes.Routes.login, (route) => false);
-            },
-          ),
-          
-          const SizedBox(height: 16),
-        ],
+        ),
       ),
     );
   }
@@ -168,23 +154,33 @@ class ProfileMenuSheet extends StatelessWidget {
     Color? textColor,
     bool isLogout = false,
   }) {
+    final theme = Theme.of(context);
+    final borderColor = theme.inputDecorationTheme.enabledBorder?.borderSide.color ?? Colors.grey.shade300;
+    final effectiveBorderColor = isLogout ? const Color(0xFFFFCDD2) : borderColor;
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(30), // Daha yuvarlak köşeler
+      borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(30),
-          border: isLogout ? Border.all(color: const Color(0xFFFFCDD2), width: 1.5) : null, // Sadece çıkışta kırmızı border
+          border: Border.all(color: effectiveBorderColor, width: 1.5),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
-             if (!isLogout) // Çıkış butonunda gölge yok gibi duruyor screenshotta, diğerlerinde olabilir
-              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 5, offset: const Offset(0, 2))
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
           ],
         ),
         child: Row(
           children: [
-            Icon(icon, color: iconColor, size: 24),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: (iconColor ?? theme.colorScheme.primary).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
@@ -192,11 +188,68 @@ class ProfileMenuSheet extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16, 
                   fontWeight: FontWeight.w600, 
-                  color: textColor,
+                  color: textColor ?? theme.textTheme.bodyLarge?.color,
                 ),
               ),
             ),
             Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey.shade400),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomThemeSwitch extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _CustomThemeSwitch({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        width: 60,
+        height: 32,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE0E0E0), // Light grey background like the image
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Stack(
+          children: [
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: value ? const Color(0xFF757575) : Colors.orange, // Dark grey for moon, Orange for sun
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  value ? Icons.nightlight_round : Icons.wb_sunny_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+            ),
           ],
         ),
       ),

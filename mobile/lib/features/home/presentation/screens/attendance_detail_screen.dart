@@ -95,7 +95,7 @@ class _AttendanceDetailScreenState extends State<AttendanceDetailScreen> {
         title: const Text("Yoklama Detayı"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete_forever, color: Colors.red),
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
             onPressed: _deleteSession,
             tooltip: "Yoklamayı Sil",
           ),

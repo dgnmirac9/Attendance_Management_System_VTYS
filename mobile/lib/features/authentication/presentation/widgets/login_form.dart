@@ -26,28 +26,34 @@ class _LoginFormState extends State<LoginForm> {
       
       setState(() => _isLoading = true); 
 
-      final userData = await _authService.loginUser(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-
-      if (userData != null) {
-        final role = userData['role'] ?? 'student';
-        
-        if (!mounted) return;
-        
-        Navigator.pushReplacementNamed(
-          context, 
-          app_routes.Routes.home, 
-          arguments: role 
+      try {
+        final userData = await _authService.loginUser(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
         );
-      } else {
-        if (!mounted) return;
-        SnackbarUtils.showError(context, 'Giriş Başarısız! E-posta veya şifre yanlış.');
+
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+
+        if (userData != null) {
+          final role = userData['role'] ?? 'student';
+          
+          if (!mounted) return;
+          
+          Navigator.pushReplacementNamed(
+            context, 
+            app_routes.Routes.home, 
+            arguments: role 
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          // Hata mesajını temizle ve göster
+          final errorMessage = e.toString().replaceAll("Exception: ", "");
+          SnackbarUtils.showError(context, errorMessage);
+        }
       }
     }
   }
@@ -85,7 +91,7 @@ class _LoginFormState extends State<LoginForm> {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        Icons.lock_outline,
+                        Icons.person,
                         size: 48,
                         color: Theme.of(context).colorScheme.primary,
                       ),

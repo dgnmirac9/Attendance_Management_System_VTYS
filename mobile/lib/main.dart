@@ -45,7 +45,7 @@ class MyApp extends StatelessWidget {
           themeMode: currentMode, // Dinamik olarak burası değişecek
 
           // Rota
-          initialRoute: Routes.login,
+          initialRoute: Routes.splash,
           onGenerateRoute: Routes.onGenerateRoute,
         );
       },

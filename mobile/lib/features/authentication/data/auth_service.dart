@@ -7,6 +7,8 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  AuthService();
+
   // --- SINIF KODU ÜRETME (6 HANELİ BENZERSİZ ID) ---
   // Statik 6 haneli kalıcı kodu üretir
   Future<String> _generateUniqueClassCode() async {
@@ -37,10 +39,11 @@ class AuthService {
     String? studentNo,
     List<List<double>>? faceEmbeddings, // YENİ: Yüz verileri
   }) async {
+    UserCredential? userCredential;
     try {
       debugPrint("🚀 1. Kayıt işlemi başladı...");
       
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -64,9 +67,15 @@ class AuthService {
       debugPrint("❌ Firebase Hatası: ${e.code}");
       if (e.code == 'email-already-in-use') return 'Bu e-posta adresi zaten kayıtlı.';
       if (e.code == 'weak-password') return 'Şifre çok zayıf (en az 6 karakter olmalı).';
+      if (e.code == 'network-request-failed') return 'İnternet bağlantısı yok. Lütfen ağ ayarlarınızı kontrol edin.';
       return "Kayıt Hatası: ${e.message}";
     } catch (e) {
       debugPrint("☠️ Genel Hata: $e");
+      // EĞER VERİTABANI KAYDI BAŞARISIZ OLURSA, KULLANICIYI SİL (ZOMBİ HESAP OLMASIN)
+      if (userCredential != null) {
+        await userCredential.user?.delete();
+        debugPrint("⚠️ Veritabanı hatası nedeniyle kullanıcı silindi.");
+      }
       return "Beklenmedik bir hata oluştu: $e";
     }
   }
@@ -78,6 +87,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+
     try {
       debugPrint("🚀 Giriş deneniyor: $email");
 
@@ -95,15 +105,19 @@ class AuthService {
         return userDoc.data() as Map<String, dynamic>;
       } else {
         debugPrint("⚠️ Giriş yapıldı ama veritabanında kaydı yok!");
-        return null;
+        throw Exception("Kullanıcı profili bulunamadı. Kayıt işlemi yarım kalmış olabilir.");
       }
 
     } on FirebaseAuthException catch (e) {
       debugPrint("❌ Giriş Hatası: ${e.code}");
-      return null; 
+      if (e.code == 'user-not-found') throw Exception("Kullanıcı bulunamadı.");
+      if (e.code == 'wrong-password') throw Exception("Şifre yanlış.");
+      if (e.code == 'invalid-credential') throw Exception("E-posta veya şifre hatalı.");
+      if (e.code == 'network-request-failed') throw Exception("İnternet bağlantısı yok. Lütfen ağ ayarlarınızı kontrol edin.");
+      throw Exception("Giriş Hatası: ${e.message}");
     } catch (e) {
       debugPrint("☠️ Genel Hata: $e");
-      return null;
+      throw Exception(e.toString().replaceAll("Exception: ", ""));
     }
   }
 
@@ -240,24 +254,26 @@ class AuthService {
       AuthCredential credential = EmailAuthProvider.credential(email: email, password: oldPassword);
       await user.reauthenticateWithCredential(credential);
       await user.updatePassword(newPassword);
-      debugPrint("🎉 Şifre başarıyla güncellendi!");
       return null;
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'wrong-password' || e.code == 'user-not-found') {
+      if (e.code == 'wrong-password' || e.code == 'user-not-found' || e.code == 'invalid-credential') {
         return "Mevcut şifreniz yanlış.";
       } else if (e.code == 'requires-recent-login') {
         return "Güvenlik nedeniyle tekrar giriş yapıp deneyin.";
       }
       return "Hata oluştu: ${e.message}";
     } catch (e) {
-      debugPrint("☠️ GENEL HATA: $e");
-      return "Beklenmedik bir hata oluştu.";
+      return "Bir hata oluştu: $e";
     }
   }
 
   // ==================================================
   // 5. CANLI SINIF LİSTESİNİ ÇEKME
   // ==================================================
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getClassStream(String classCode) {
+    return _firestore.collection('classes').doc(classCode).snapshots();
+  }
 
   Stream<List<Map<String, dynamic>>> getClassesStream(String uid, String role) {
     Query query;
@@ -277,20 +293,14 @@ class AuthService {
     // Sorguyu canlı dinleyen Stream'i döndür
     return query.snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
-        // Her dokümanı Map olarak döndür
-        return doc.data() as Map<String, dynamic>;
+        final data = doc.data() as Map<String, dynamic>;
+        // Öğrenci sayısını hesapla
+        final studentUids = data['studentUids'] as List<dynamic>? ?? [];
+        data['studentCount'] = studentUids.length;
+        return data;
       }).toList();
     });
   }
-
-  // 5.1. Tek Bir Sınıfı Canlı Dinle
-  Stream<DocumentSnapshot<Map<String, dynamic>>> getClassStream(String classCode) {
-    return _firestore.collection('classes').doc(classCode).snapshots();
-  }
-
-  // ==================================================
-  // 6. YOKLAMA YÖNETİMİ (ATTENDANCE)
-  // ==================================================
 
   // 6.1. Yeni Yoklama Oturumu Başlat (Hoca)
   Future<String?> startAttendanceSession(String classCode) async {
@@ -517,7 +527,7 @@ class AuthService {
   // ==================================================
   Future<void> signOut() async {
     await _auth.signOut();
-    debugPrint("� Çıkış yapıldı.");
+    debugPrint(" Çıkış yapıldı.");
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> getUserStream(String uid) {

@@ -26,22 +26,31 @@ class ClassDetailsScreen extends StatefulWidget {
   State<ClassDetailsScreen> createState() => _ClassDetailsScreenState();
 }
 
-class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
   final AuthService _authService = AuthService();
   final String _currentUid = FirebaseAuth.instance.currentUser!.uid;
   bool _isTeacher = false;
   String _teacherName = "Yükleniyor...";
+  int _selectedIndex = 0;
+
+  late Stream<List<Map<String, dynamic>>> _announcementsStream;
+  late Stream<List<Map<String, dynamic>>> _studentsStream;
+  late Stream<List<Map<String, dynamic>>> _historyStream;
+  late Stream<DocumentSnapshot<Map<String, dynamic>>> _classStream;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      setState(() {}); // FAB güncellemesi için
-    });
     _checkUserRole();
     _fetchTeacherName();
+    _initializeStreams();
+  }
+
+  void _initializeStreams() {
+    _announcementsStream = _authService.getAnnouncements(widget.classCode);
+    _studentsStream = _authService.getClassStudents(widget.classCode);
+    _historyStream = _authService.getAttendanceHistory(widget.classCode);
+    _classStream = _authService.getClassStream(widget.classCode);
   }
 
   Future<void> _checkUserRole() async {
@@ -66,349 +75,642 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTick
     }
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            SliverAppBar(
-              expandedHeight: 250.0,
-              floating: false,
-              pinned: true,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Collapsed durumda arkaplan rengi (Sayfa rengi)
-              surfaceTintColor: Colors.transparent, 
-              leading: Container(
-                margin: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
-              flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.pin,
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Arkaplan Gradyanı
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF2E3192), // Koyu Mavi
-                            Color(0xFF1BFFFF), // Açık Mavi
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Dekoratif Desen
-                    Positioned(
-                      right: -40,
-                      top: -40,
-                      child: Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.05),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: -20,
-                      bottom: -20,
-                      child: Icon(
-                        Icons.school,
-                        size: 160,
-                        color: Colors.white.withValues(alpha: 0.1),
-                      ),
-                    ),
-                    
-                    // BAŞLIK VE HOCA BİLGİSİ - SOL ALT
-                    Positioned(
-                      left: 20,
-                      right: 160, // Kopyala butonu için yer bırak
-                      bottom: 20, // TabBar artık ayrı olduğu için daha aşağı inebilir
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                            stream: _authService.getClassStream(widget.classCode),
-                            builder: (context, snapshot) {
-                              String displayName = widget.className;
-                              if (snapshot.hasData && snapshot.data!.exists) {
-                                final data = snapshot.data!.data();
-                                if (data != null && data.containsKey('name')) {
-                                  displayName = data['name'];
-                                }
-                              }
-                              return Text(
-                                displayName,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 22,
-                                  shadows: [
-                                    Shadow(
-                                      offset: Offset(0, 2),
-                                      blurRadius: 4.0,
-                                      color: Colors.black45,
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.person, size: 14, color: Colors.white70),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  _teacherName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // --- HEADER (STATIC) ---
+            SizedBox(
+              height: 200, // Fixed height for header
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Arkaplan Gradyanı
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF2E3192), // Koyu Mavi
+                          Color(0xFF1BFFFF), // Açık Mavi
                         ],
                       ),
                     ),
+                  ),
+                  // Dekoratif Desen
+                  Positioned(
+                    right: -40,
+                    top: -40,
+                    child: Container(
+                      width: 200,
+                      height: 200,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: -20,
+                    bottom: -20,
+                    child: Icon(
+                      Icons.school,
+                      size: 160,
+                      color: Colors.white.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  
+                  // GERİ BUTONU
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                  ),
 
-                    // KOPYALA BUTONU - SAĞ ALT KÖŞE
-                    Positioned(
-                      bottom: 20, 
-                      right: 16,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            )
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                          ),
-                          child: InkWell(
-                            onTap: () {
-                              Clipboard.setData(ClipboardData(text: widget.classCode));
-                              SnackbarUtils.showInfo(context, "Sınıf kodu kopyalandı: ${widget.classCode}");
-                            },
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.copy, color: Colors.white, size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    widget.classCode,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      fontFamily: 'monospace',
-                                      letterSpacing: 1.5,
-                                    ),
+                  // AYARLAR BUTONU
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.settings, color: Colors.white, size: 20),
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => ClassSettingsBottomSheet(
+                              className: widget.className,
+                              classCode: widget.classCode,
+                              isTeacher: _isTeacher,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                  // BAŞLIK VE HOCA BİLGİSİ - SOL ALT
+                  Positioned(
+                    left: 20,
+                    right: 160,
+                    bottom: 20,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                          stream: _classStream,
+                          builder: (context, snapshot) {
+                            String displayName = widget.className;
+                            if (snapshot.hasData && snapshot.data!.exists) {
+                              final data = snapshot.data!.data();
+                              if (data != null && data.containsKey('name')) {
+                                displayName = data['name'];
+                              }
+                            }
+                            return Text(
+                              displayName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 22,
+                                shadows: [
+                                  Shadow(
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4.0,
+                                    color: Colors.black45,
                                   ),
                                 ],
                               ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.person, size: 14, color: Colors.white70),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                _teacherName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // KOPYALA BUTONU - SAĞ ALT KÖŞE
+                  Positioned(
+                    bottom: 20, 
+                    right: 16,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          )
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                        ),
+                        child: InkWell(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: widget.classCode));
+                            SnackbarUtils.showInfo(context, "Sınıf kodu kopyalandı: ${widget.classCode}");
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.copy, color: Colors.white, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  widget.classCode,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    fontFamily: 'monospace',
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              actions: [
-                Container(
-                  margin: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
                   ),
-                  child: IconButton(
-                    icon: const Icon(Icons.settings, color: Colors.white, size: 20),
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) => ClassSettingsBottomSheet(
-                          className: widget.className,
-                          classCode: widget.classCode,
-                          isTeacher: _isTeacher,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-            SliverPersistentHeader(
-              delegate: _SliverAppBarDelegate(
-                TabBar(
-                  controller: _tabController,
-                  labelColor: theme.colorScheme.primary,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: theme.colorScheme.primary,
-                  indicatorWeight: 3,
-                  labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                  tabs: const [
-                    Tab(icon: Icon(Icons.dashboard_outlined), text: "Pano"),
-                    Tab(icon: Icon(Icons.people_outline), text: "Öğrenciler"),
-                    Tab(icon: Icon(Icons.history), text: "Geçmiş"),
-                  ],
-                ),
+                ],
               ),
-              pinned: true,
             ),
-          ];
-        },
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildAnnouncementsTab(context),
-            _buildStudentsTab(context),
-            _buildHistoryTab(context),
+            
+            // --- BODY (TABS) ---
+            Expanded(
+              child: Builder(
+                builder: (context) {
+                  switch (_selectedIndex) {
+                    case 0:
+                      return _buildAnnouncementsTab(context);
+                    case 1:
+                      return _buildStudentsTab(context);
+                    case 2:
+                      return _buildHistoryTab(context);
+                    default:
+                      return _buildAnnouncementsTab(context);
+                  }
+                },
+              ),
+            ),
           ],
         ),
       ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _onItemTapped,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Pano',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: 'Öğrenciler',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
+            label: 'Geçmiş',
+          ),
+        ],
+      ),
       floatingActionButton: _buildFloatingActionButton(),
+    );
+  }
+
+  // --- REUSABLE EMPTY STATE ---
+  Widget _buildEmptyState({required IconData icon, required String message}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Container(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3), // Dynamic Background
+            width: double.infinity,
+            height: double.infinity,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 64, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   // --- 1. PANO (DUYURULAR) SEKMESİ ---
   Widget _buildAnnouncementsTab(BuildContext context) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _authService.getAnnouncements(widget.classCode),
+      stream: _announcementsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const CustomScrollView(
+            physics: AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ],
+          );
         }
 
         final announcements = snapshot.data ?? [];
 
         if (announcements.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.campaign_outlined, size: 64, color: Colors.grey.withValues(alpha: 0.5)),
-                const SizedBox(height: 16),
-                Text(
-                  "Henüz duyuru yok",
-                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                ),
-              ],
-            ),
+          return _buildEmptyState(
+            icon: Icons.campaign_outlined,
+            message: "Henüz duyuru yok",
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: announcements.length,
-          itemBuilder: (context, index) {
-            final announcement = announcements[index];
-            final date = (announcement['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
-            final dateStr = "${date.day}.${date.month}.${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+        return CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final announcement = announcements[index];
+                    final date = (announcement['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+                    final dateStr = "${date.day}.${date.month}.${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
 
-            return Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            announcement['title'] ?? 'Başlıksız',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    announcement['title'] ?? 'Başlıksız',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                ),
+                                if (_isTeacher)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                    onPressed: () => _deleteAnnouncement(announcement['id']),
+                                    tooltip: 'Duyuruyu Sil',
+                                  ),
+                              ],
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            Text(
+                              announcement['content'] ?? '',
+                              style: const TextStyle(fontSize: 15, height: 1.4),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text(
+                                  dateStr,
+                                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        if (_isTeacher)
-                          PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert),
-                            onSelected: (value) {
-                              if (value == 'delete') {
-                                _deleteAnnouncement(announcement['id']);
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
+                      ),
+                    );
+                  },
+                  childCount: announcements.length,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- 2. ÖĞRENCİLER SEKMESİ (GERÇEK VERİ) ---
+  Widget _buildStudentsTab(BuildContext context) {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _studentsStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const CustomScrollView(
+            physics: AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ],
+          );
+        }
+        
+        if (snapshot.hasError) {
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text("Hata: ${snapshot.error}")),
+              ),
+            ],
+          );
+        }
+
+        final students = snapshot.data ?? [];
+
+        if (students.isEmpty) {
+          return _buildEmptyState(
+            icon: Icons.people_outline,
+            message: "Henüz kayıtlı öğrenci yok.",
+          );
+        }
+
+        return CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final student = students[index];
+                    final firstName = student['firstName'] ?? '';
+                    final lastName = student['lastName'] ?? '';
+                    final fullName = "$firstName $lastName";
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: InkWell(
+                        onTap: _isTeacher ? () {
+                          // HOCA İSE DETAY GÖSTER
+                          showDialog(
+                            context: context,
+                            builder: (context) => StudentDetailDialog(studentData: student),
+                          );
+                        } : null, // ÖĞRENCİ İSE TIKLANAMAZ
+                        borderRadius: BorderRadius.circular(12),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: CircleAvatar(
+                            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                            foregroundColor: Theme.of(context).colorScheme.primary,
+                            child: Text(firstName.isNotEmpty ? firstName[0] : "?"),
+                          ),
+                          title: Text(
+                            fullName,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          trailing: _isTeacher ? const Icon(Icons.info_outline, size: 20, color: Colors.grey) : null,
+                        ),
+                      ),
+                    );
+                  },
+                  childCount: students.length,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- 3. GEÇMİŞ SEKMESİ (GERÇEK VERİ) ---
+  Widget _buildHistoryTab(BuildContext context) {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _historyStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const CustomScrollView(
+            physics: AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ],
+          );
+        }
+
+        final history = snapshot.data ?? [];
+
+        if (history.isEmpty) {
+          return _buildEmptyState(
+            icon: Icons.history,
+            message: "Henüz yoklama kaydı yok.",
+          );
+        }
+
+        return CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final session = history[index];
+                    final timestamp = session['createdAt'] as Timestamp?;
+                    final date = timestamp?.toDate() ?? DateTime.now();
+                    final attendees = (session['attendees'] as List<dynamic>?)?.cast<String>() ?? [];
+                    final sessionId = session['sessionId'] ?? '';
+                    
+                    bool amIPresent = attendees.contains(_currentUid);
+                    
+                    final dateStr = "${date.day}.${date.month}.${date.year}";
+                    final timeStr = "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: InkWell(
+                        onTap: () {
+                          if (_isTeacher) {
+                            // HOCA: DETAY SAYFASINA GİT
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AttendanceDetailScreen(
+                                  classCode: widget.classCode,
+                                  sessionId: sessionId,
+                                  date: date,
+                                  attendeeUids: attendees,
+                                ),
+                              ),
+                            );
+                          } else {
+                            // ÖĞRENCİ: Sadece bilgi (belki ilerde detay)
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Column(
                                   children: [
-                                    Icon(Icons.delete, color: Colors.red, size: 20),
-                                    SizedBox(width: 8),
-                                    Text("Sil", style: TextStyle(color: Colors.red)),
+                                    Text(
+                                      dateStr.split('.')[0], // Gün
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                    Text(
+                                      _getMonthName(date.month),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Ders Yoklaması",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                    ),
+                                    Text(
+                                      "Saat: $timeStr",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (!_isTeacher)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: amIPresent 
+                                      ? Colors.green.withValues(alpha: 0.1) 
+                                      : Colors.red.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        amIPresent ? Icons.check_circle : Icons.cancel,
+                                        size: 16,
+                                        color: amIPresent ? Colors.green : Colors.red,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        amIPresent ? "VAR" : "YOK",
+                                        style: TextStyle(
+                                          color: amIPresent ? Colors.green : Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (_isTeacher)
+                                const Icon(Icons.chevron_right, color: Colors.grey),
                             ],
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      announcement['content'] ?? '',
-                      style: const TextStyle(fontSize: 15, height: 1.4),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(Icons.access_time, size: 14, color: Colors.grey),
-                        const SizedBox(width: 4),
-                        Text(
-                          dateStr,
-                          style: const TextStyle(color: Colors.grey, fontSize: 12),
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    );
+                  },
+                  childCount: history.length,
                 ),
               ),
-            );
-          },
+            ),
+          ],
         );
       },
     );
@@ -505,7 +807,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTick
 
   Widget? _buildFloatingActionButton() {
     // 1. PANO SEKMESİ (Sadece Hoca Duyuru Ekler)
-    if (_tabController.index == 0) {
+    if (_selectedIndex == 0) {
       if (_isTeacher) {
         return FloatingActionButton(
           onPressed: _showAddAnnouncementDialog,
@@ -519,7 +821,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTick
     }
 
     // 2. ÖĞRENCİLER SEKMESİ (QR İşlemleri)
-    if (_tabController.index == 1) {
+    if (_selectedIndex == 1) {
       return FloatingActionButton(
         onPressed: () {
           if (_isTeacher) {
@@ -582,268 +884,8 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> with SingleTick
     }
   }
 
-  // --- 2. ÖĞRENCİLER SEKMESİ (GERÇEK VERİ) ---
-  Widget _buildStudentsTab(BuildContext context) {
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _authService.getClassStudents(widget.classCode),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        
-        if (snapshot.hasError) {
-          return Center(child: Text("Hata: ${snapshot.error}"));
-        }
-
-        final students = snapshot.data ?? [];
-
-        if (students.isEmpty) {
-          return const Center(child: Text("Henüz kayıtlı öğrenci yok."));
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: students.length,
-          itemBuilder: (context, index) {
-            final student = students[index];
-            final firstName = student['firstName'] ?? '';
-            final lastName = student['lastName'] ?? '';
-            final fullName = "$firstName $lastName";
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
-                ),
-              ),
-              child: InkWell(
-                onTap: _isTeacher ? () {
-                  // HOCA İSE DETAY GÖSTER
-                  showDialog(
-                    context: context,
-                    builder: (context) => StudentDetailDialog(studentData: student),
-                  );
-                } : null, // ÖĞRENCİ İSE TIKLANAMAZ
-                borderRadius: BorderRadius.circular(12),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  leading: CircleAvatar(
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    foregroundColor: Theme.of(context).colorScheme.primary,
-                    child: Text(firstName.isNotEmpty ? firstName[0] : "?"),
-                  ),
-                  title: Text(
-                    fullName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  trailing: _isTeacher ? const Icon(Icons.info_outline, size: 20, color: Colors.grey) : null,
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // --- 3. GEÇMİŞ SEKMESİ (GERÇEK VERİ) ---
-  Widget _buildHistoryTab(BuildContext context) {
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _authService.getAttendanceHistory(widget.classCode),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final history = snapshot.data ?? [];
-
-        if (history.isEmpty) {
-          return const Center(child: Text("Henüz yoklama kaydı yok."));
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: history.length,
-          itemBuilder: (context, index) {
-            final session = history[index];
-            final timestamp = session['createdAt'] as Timestamp?;
-            final date = timestamp?.toDate() ?? DateTime.now();
-            final attendees = (session['attendees'] as List<dynamic>?)?.cast<String>() ?? [];
-            final sessionId = session['sessionId'] ?? '';
-            
-            bool amIPresent = attendees.contains(_currentUid);
-            
-            final dateStr = "${date.day}.${date.month}.${date.year}";
-            final timeStr = "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
-                ),
-              ),
-              child: InkWell(
-                onTap: () {
-                  if (_isTeacher) {
-                    // HOCA: DETAY SAYFASINA GİT
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AttendanceDetailScreen(
-                          classCode: widget.classCode,
-                          sessionId: sessionId,
-                          date: date,
-                          attendeeUids: attendees,
-                        ),
-                      ),
-                    );
-                  } else {
-                    // ÖĞRENCİ: Sadece bilgi (belki ilerde detay)
-                  }
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              dateStr.split('.')[0], // Gün
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                            Text(
-                              _getMonthName(date.month),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Ders Yoklaması",
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              "Saat: $timeStr",
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      // DURUM GÖSTERGESİ
-                      if (_isTeacher)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                "${attendees.length} Kişi",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(Icons.chevron_right, size: 16, color: Theme.of(context).colorScheme.primary),
-                            ],
-                          ),
-                        )
-                      else
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: amIPresent 
-                                ? Colors.green.withValues(alpha: 0.1) 
-                                : Colors.red.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                amIPresent ? Icons.check_circle : Icons.cancel,
-                                size: 16,
-                                color: amIPresent ? Colors.green : Colors.red,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                amIPresent ? "VAR" : "YOK",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: amIPresent ? Colors.green : Colors.red,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   String _getMonthName(int month) {
     const months = ["OCA", "ŞUB", "MAR", "NİS", "MAY", "HAZ", "TEM", "AĞU", "EYL", "EKİ", "KAS", "ARA"];
     return months[month - 1];
-  }
-}
-
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar _tabBar;
-
-  _SliverAppBarDelegate(this._tabBar);
-
-  @override
-  double get minExtent => _tabBar.preferredSize.height;
-  @override
-  double get maxExtent => _tabBar.preferredSize.height;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: _tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
   }
 }
