@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../auth/providers/auth_controller.dart';
-import 'join_class_dialog.dart';
-import 'class_detail_screen.dart';
+import '../../../auth/providers/auth_controller.dart';
+import '../join_class_dialog.dart';
+import 'student_class_detail_screen.dart';
 
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+class StudentHomeScreen extends ConsumerWidget {
+  const StudentHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = FirebaseAuth.instance.currentUser;
-    final userEmail = user?.email ?? 'Kullanıcı';
+    final userEmail = user?.email ?? 'Öğrenci';
 
-    // Dummy data for classes
+    // Dummy data for classes student is enrolled in
     final List<String> classes = [
       "YZM302 - Mikroişlemciler",
       "YZM304 - İşletim Sistemleri",
@@ -25,7 +25,7 @@ class HomeScreen extends ConsumerWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Derslerim', style: TextStyle(fontSize: 16)),
+            const Text('Derslerim (Öğrenci)', style: TextStyle(fontSize: 16)),
             Text(
               userEmail,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
@@ -59,7 +59,7 @@ class HomeScreen extends ConsumerWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ClassDetailScreen(className: className),
+                    builder: (context) => StudentClassDetailScreen(className: className),
                   ),
                 );
               },

@@ -12,16 +12,33 @@ class UserService {
     String role = 'student',
   }) async {
     try {
-      await _firestore.collection('users').doc(uid).set({
+      final Map<String, dynamic> userData = {
         'name': name,
-        'studentId': studentId,
         'email': email,
         'role': role,
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (role == 'student') {
+        userData['studentId'] = studentId;
+      }
+
+      await _firestore.collection('users').doc(uid).set(userData);
     } catch (e) {
       debugPrint('Error saving user data: $e');
       rethrow;
+    }
+  }
+  Future<String?> getUserRole(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        return doc.data()?['role'] as String?;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting user role: $e');
+      return null;
     }
   }
 }
