@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../auth/providers/auth_controller.dart';
-
+import '../../providers/classroom_provider.dart';
 import 'academic_class_detail_screen.dart';
+import 'create_class_dialog.dart';
 
 class AcademicHomeScreen extends ConsumerWidget {
   const AcademicHomeScreen({super.key});
@@ -12,12 +13,7 @@ class AcademicHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = FirebaseAuth.instance.currentUser;
     final userEmail = user?.email ?? 'Akademisyen';
-
-    // Dummy data for classes created by academic
-    final List<String> classes = [
-      "YZM302 - Mikroişlemciler",
-      "YZM304 - İşletim Sistemleri",
-    ];
+    final classesAsync = ref.watch(userClassesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -54,41 +50,58 @@ class AcademicHomeScreen extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: classes.length,
-              itemBuilder: (context, index) {
-                final className = classes[index];
-                return Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Text(
-                      className,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AcademicClassDetailScreen(className: className),
+            child: classesAsync.when(
+              data: (snapshot) {
+                if (snapshot.docs.isEmpty) {
+                  return const Center(child: Text("Henüz ders oluşturmadınız."));
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16.0),
+                  itemCount: snapshot.docs.length,
+                  itemBuilder: (context, index) {
+                    final doc = snapshot.docs[index];
+                    final data = doc.data() as Map<String, dynamic>;
+                    final className = data['className'] ?? 'İsimsiz Ders';
+                    final joinCode = data['joinCode'] ?? '---';
+                    final studentCount = (data['studentIds'] as List?)?.length ?? 0;
+
+                    return Card(
+                      elevation: 2,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        title: Text(
+                          className,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                      );
-                    },
-                  ),
+                        subtitle: Text("Kod: $joinCode | Öğrenci: $studentCount"),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AcademicClassDetailScreen(
+                                className: className,
+                                classId: doc.id,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
                 );
               },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, s) => Center(child: Text('Hata: $e')),
             ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Open CreateClassDialog
           showDialog(
             context: context,
-            builder: (context) => const AlertDialog(title: Text("Ders Oluştur (Mock)")),
+            builder: (context) => const CreateClassDialog(),
           );
         },
         child: const Icon(Icons.add),

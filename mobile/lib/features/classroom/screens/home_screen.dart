@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../auth/providers/auth_controller.dart';
-import 'join_class_dialog.dart';
+import 'student/join_class_dialog.dart';
 import 'class_detail_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -59,7 +59,7 @@ class HomeScreen extends ConsumerWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ClassDetailScreen(className: className),
+                    builder: (context) => ClassDetailScreen(className: className, classId: '',),
                   ),
                 );
               },

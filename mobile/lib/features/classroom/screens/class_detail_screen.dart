@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:attendance_management_system_vtys/features/attendance/providers/attendance_provider.dart';
 import 'documents_screen.dart';
-import '../../attendance/providers/attendance_provider.dart';
 
 class ClassDetailScreen extends ConsumerWidget {
   final String className;
+  final String classId;
 
-  const ClassDetailScreen({super.key, required this.className});
+  const ClassDetailScreen({
+    super.key,
+    required this.className,
+    required this.classId,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final activeSessionAsync = ref.watch(activeSessionProvider(classId));
+
     return Scaffold(
       appBar: AppBar(
         title: Text(className),
@@ -26,36 +33,45 @@ class ClassDetailScreen extends ConsumerWidget {
                   SizedBox(
                     width: 200,
                     height: 200,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        shape: const CircleBorder(),
-                      ),
-                      onPressed: () {
-                        final isActive = ref.read(isAttendanceActiveProvider);
-                        if (isActive) {
-                          debugPrint("Kamera açılıyor");
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Şu an aktif bir yoklama yok.'),
-                              backgroundColor: Colors.redAccent,
-                            ),
-                          );
-                        }
-                      },
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.camera_alt, size: 50),
-                          SizedBox(height: 10),
-                          Text(
-                            'YOKLAMAYA\nKATIL',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                    child: activeSessionAsync.when(
+                      data: (snapshot) {
+                        final isActive = snapshot.docs.isNotEmpty;
+                        return FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: isActive ? Colors.green : Colors.grey,
+                            shape: const CircleBorder(),
                           ),
-                        ],
-                      ),
+                          onPressed: isActive
+                              ? () {
+                                  debugPrint("Kamera açılıyor");
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Kamera açılıyor...')),
+                                  );
+                                }
+                              : () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Şu an aktif bir yoklama yok.'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.camera_alt, size: 50),
+                              const SizedBox(height: 10),
+                              Text(
+                                isActive ? 'YOKLAMAYA\nKATIL' : 'YOKLAMA\nYOK',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      loading: () => const CircularProgressIndicator(),
+                      error: (e, s) => Text('Hata: $e'),
                     ),
                   ),
                   const SizedBox(height: 24),
