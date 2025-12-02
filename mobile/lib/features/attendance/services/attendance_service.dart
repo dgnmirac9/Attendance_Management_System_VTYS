@@ -51,4 +51,35 @@ class AttendanceService {
         .limit(1)
         .snapshots();
   }
+
+  // Watch if a specific user has already attended a session
+  Stream<DocumentSnapshot> watchUserAttendance({
+    required String classId,
+    required String sessionId,
+    required String userId,
+  }) {
+    return _firestore
+        .collection('classes')
+        .doc(classId)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('records')
+        .doc(userId)
+        .snapshots();
+  }
+
+  // Get live attendance records for a session
+  Stream<QuerySnapshot> getLiveAttendance({
+    required String classId,
+    required String sessionId,
+  }) {
+    return _firestore
+        .collection('classes')
+        .doc(classId)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('records')
+        .orderBy('timestamp', descending: true)
+        .snapshots();
+  }
 }

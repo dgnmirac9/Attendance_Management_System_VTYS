@@ -32,57 +32,86 @@ class StudentClassDetailScreen extends ConsumerWidget {
                 final hasActiveSession = snapshot.docs.isNotEmpty;
                 final activeSessionId = hasActiveSession ? snapshot.docs.first.id : null;
 
-                return FilledButton.icon(
-                  onPressed: hasActiveSession && !isLoading
-                      ? () async {
-                          final photoFile = await Navigator.push<File>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CameraScreen(),
-                            ),
-                          );
+                if (!hasActiveSession) {
+                  return FilledButton.icon(
+                    onPressed: null,
+                    icon: const Icon(Icons.camera_alt),
+                    label: const Text('Aktif Yoklama Yok'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.grey,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  );
+                }
 
-                          if (photoFile != null && context.mounted) {
-                            try {
-                              await ref
-                                  .read(attendanceControllerProvider.notifier)
-                                  .markAttendance(
-                                    classId: classId,
-                                    sessionId: activeSessionId!,
-                                    photo: photoFile,
-                                  );
-                              
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Yoklamanız başarıyla alındı!'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Hata: $e'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                // Watch attendance status for the active session
+                final attendanceStatusAsync = ref.watch(
+                  userAttendanceStatusProvider((classId: classId, sessionId: activeSessionId!)),
+                );
+
+                return attendanceStatusAsync.when(
+                  data: (hasAttended) {
+                    return FilledButton.icon(
+                      onPressed: !hasAttended && !isLoading
+                          ? () async {
+                              final photoFile = await Navigator.push<File>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const CameraScreen(),
+                                ),
+                              );
+
+                              if (photoFile != null && context.mounted) {
+                                try {
+                                  await ref
+                                      .read(attendanceControllerProvider.notifier)
+                                      .markAttendance(
+                                        classId: classId,
+                                        sessionId: activeSessionId,
+                                        photo: photoFile,
+                                      );
+                                  
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Yoklamanız başarıyla alındı!'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Hata: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
                               }
                             }
-                          }
-                        }
-                      : null,
-                  icon: isLoading
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Icon(Icons.camera_alt),
-                  label: Text(isLoading ? 'İşleniyor...' : (hasActiveSession ? 'YOKLAMAYA KATIL' : 'Aktif Yoklama Yok')),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: hasActiveSession ? Colors.green : Colors.grey,
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
+                          : null,
+                      icon: hasAttended 
+                          ? const Icon(Icons.check_circle) 
+                          : (isLoading
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Icon(Icons.camera_alt)),
+                      label: Text(hasAttended 
+                          ? 'Katıldınız' 
+                          : (isLoading ? 'İşleniyor...' : 'YOKLAMAYA KATIL')),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: hasAttended ? Colors.grey : Colors.green,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, s) => Center(child: Text('Hata: $e')),
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),

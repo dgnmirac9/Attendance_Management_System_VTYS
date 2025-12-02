@@ -16,6 +16,28 @@ final activeSessionProvider = StreamProvider.family<QuerySnapshot, String>((ref,
   return service.getActiveSession(classId);
 });
 
+// Stream to check if the current user has attended the session
+final userAttendanceStatusProvider = StreamProvider.family<bool, ({String classId, String sessionId})>((ref, params) {
+  final service = ref.watch(attendanceServiceProvider);
+  final user = ref.watch(authStateChangesProvider).value;
+  
+  if (user == null) return Stream.value(false);
+
+  return service
+      .watchUserAttendance(
+        classId: params.classId,
+        sessionId: params.sessionId,
+        userId: user.uid,
+      )
+      .map((snapshot) => snapshot.exists);
+});
+
+// Stream of live attendance records for a session
+final sessionAttendanceProvider = StreamProvider.family<QuerySnapshot, ({String classId, String sessionId})>((ref, params) {
+  final service = ref.watch(attendanceServiceProvider);
+  return service.getLiveAttendance(classId: params.classId, sessionId: params.sessionId);
+});
+
 class AttendanceController extends AsyncNotifier<void> {
   @override
   FutureOr<void> build() {
