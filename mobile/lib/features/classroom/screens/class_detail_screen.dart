@@ -80,7 +80,10 @@ class ClassDetailScreen extends ConsumerWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const DocumentsScreen(),
+                          builder: (context) => DocumentsScreen(
+                            classId: classId,
+                            isAcademic: false,
+                          ),
                         ),
                       );
                     },

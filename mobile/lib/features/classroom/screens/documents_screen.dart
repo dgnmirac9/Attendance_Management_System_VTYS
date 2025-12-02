@@ -1,79 +1,120 @@
+import 'package:attendance_management_system_vtys/features/auth/providers/auth_controller.dart';
+import 'package:attendance_management_system_vtys/features/classroom/services/document_service.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class DocumentsScreen extends StatelessWidget {
-  const DocumentsScreen({super.key});
+class DocumentsScreen extends ConsumerWidget {
+  final String classId;
+  final bool isAcademic;
+
+  const DocumentsScreen({
+    super.key,
+    required this.classId,
+    required this.isAcademic,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    // Mock data for documents
-    final List<Map<String, dynamic>> documents = [
-      {
-        'name': 'Hafta 1 - Giriş.pdf',
-        'date': '2023-10-02',
-        'type': 'pdf',
-      },
-      {
-        'name': 'Hafta 2 - Mimari.pptx',
-        'date': '2023-10-09',
-        'type': 'ppt', // Using generic file icon or similar for ppt if specific not requested, but user said "Word for blue", let's stick to PDF/Word as requested or general types. User said "PDF for red, Word for blue". I'll add a Word doc too.
-      },
-      {
-        'name': 'Proje Ödevi.docx',
-        'date': '2023-11-15',
-        'type': 'word',
-      },
-      {
-        'name': 'Hafta 3 - Bellek Yönetimi.pdf',
-        'date': '2023-10-16',
-        'type': 'pdf',
-      },
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final documentService = DocumentService();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ders Dokümanları'),
-      ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: documents.length,
-        itemBuilder: (context, index) {
-          final doc = documents[index];
-          final isPdf = doc['type'] == 'pdf';
-          final isWord = doc['type'] == 'word';
-          
-          IconData iconData = Icons.insert_drive_file;
-          Color iconColor = Colors.grey;
-
-          if (isPdf) {
-            iconData = Icons.picture_as_pdf;
-            iconColor = Colors.red;
-          } else if (isWord) {
-            iconData = Icons.description;
-            iconColor = Colors.blue;
+      appBar: AppBar(title: const Text('Ders Dokümanları')),
+      body: StreamBuilder(
+        stream: documentService.getDocuments(classId),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Hata: ${snapshot.error}'));
           }
 
-          return Card(
-            elevation: 1,
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: Icon(iconData, color: iconColor, size: 32),
-              title: Text(
-                doc['name'],
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-              subtitle: Text('Yüklenme Tarihi: ${doc['date']}'),
-              trailing: IconButton(
-                icon: const Icon(Icons.download_rounded),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${doc['name']} indiriliyor...')),
-                  );
-                },
-              ),
-            ),
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+
+          if (docs.isEmpty) {
+            return const Center(child: Text('Henüz yüklenen doküman yok.'));
+          }
+
+          return ListView.builder(
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index].data() as Map<String, dynamic>;
+              final name = doc['name'] as String;
+              final url = doc['url'] as String;
+              final type = doc['type'] as String?;
+
+              IconData iconData = Icons.insert_drive_file;
+              if (type == 'pdf') iconData = Icons.picture_as_pdf;
+              if (['jpg', 'jpeg', 'png'].contains(type)) iconData = Icons.image;
+
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ListTile(
+                  leading: Icon(iconData, color: Colors.blue),
+                  title: Text(name),
+                  subtitle: Text(type?.toUpperCase() ?? 'DOSYA'),
+                  trailing: const Icon(Icons.download),
+                  onTap: () async {
+                    final uri = Uri.parse(url);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } else {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Dosya açılamadı')),
+                        );
+                      }
+                    }
+                  },
+                ),
+              );
+            },
           );
         },
       ),
+      floatingActionButton: isAcademic
+          ? FloatingActionButton(
+              onPressed: () async {
+                final result = await FilePicker.platform.pickFiles();
+
+                if (result != null) {
+                  final file = result.files.first;
+                  final user = ref.read(authStateChangesProvider).value;
+
+                  if (user != null) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Yükleniyor...')),
+                      );
+                    }
+
+                    try {
+                      await documentService.uploadDocument(
+                        classId: classId,
+                        file: file,
+                        uploadedBy: user.uid,
+                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Doküman yüklendi!')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Hata: $e')),
+                        );
+                      }
+                    }
+                  }
+                }
+              },
+              child: const Icon(Icons.upload_file),
+            )
+          : null,
     );
   }
 }

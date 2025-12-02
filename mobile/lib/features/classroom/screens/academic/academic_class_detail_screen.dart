@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:attendance_management_system_vtys/features/attendance/providers/attendance_provider.dart';
+import 'package:attendance_management_system_vtys/features/classroom/screens/documents_screen.dart';
 
 class AcademicClassDetailScreen extends ConsumerWidget {
   final String className;
@@ -84,6 +85,25 @@ class AcademicClassDetailScreen extends ConsumerWidget {
                             backgroundColor: hasActiveSession ? Colors.red : Colors.green,
                             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
                             textStyle: const TextStyle(fontSize: 18),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DocumentsScreen(
+                                  classId: classId,
+                                  isAcademic: true,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.folder),
+                          label: const Text('Ders Dokümanları ve Kaynaklar'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
                           ),
                         ),
                       ],
