@@ -1,25 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; 
-import 'routes.dart';
-import 'shared/themes/app_theme.dart';
-import 'shared/themes/theme_manager.dart'; // Yeni oluşturduğumuz yönetici
+import 'features/auth/screens/auth_wrapper.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 1. Kayıtlı Temayı Yükle
-  await ThemeManager.loadTheme();
-
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await Firebase.initializeApp();
   } catch (e) {
-    debugPrint("Firebase hatası: $e");
+    debugPrint('Firebase initialization failed: $e');
   }
-
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -27,24 +18,14 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 2. Temayı Dinleyen Yapı (ValueListenableBuilder)
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeManager.themeNotifier,
-      builder: (context, currentMode, child) {
-        return MaterialApp(
-          title: 'C-LENS',
-          debugShowCheckedModeBanner: false,
-          
-          // Temalar
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: currentMode, // Dinamik olarak burası değişecek
-
-          // Rota
-          initialRoute: Routes.login,
-          onGenerateRoute: Routes.onGenerateRoute,
-        );
-      },
+    return MaterialApp(
+      title: 'Yoklama Sistemi',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      home: const AuthWrapper(),
     );
   }
 }

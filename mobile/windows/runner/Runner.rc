@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "c_lens_mobile" "\0"
+            VALUE "FileDescription", "attendance_management_system_vtys" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "c_lens_mobile" "\0"
+            VALUE "InternalName", "attendance_management_system_vtys" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "c_lens_mobile.exe" "\0"
-            VALUE "ProductName", "c_lens_mobile" "\0"
+            VALUE "OriginalFilename", "attendance_management_system_vtys.exe" "\0"
+            VALUE "ProductName", "attendance_management_system_vtys" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
