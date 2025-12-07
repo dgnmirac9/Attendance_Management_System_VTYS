@@ -79,13 +79,113 @@ class ClassroomService {
           .orderBy('createdAt', descending: true)
           .snapshots();
     } else {
-      // For students, we check if their ID is in the studentIds array
       return _firestore
           .collection('classes')
           .where('studentIds', arrayContains: userId)
-          // Note: orderBy might require an index when combined with arrayContains
-          // .orderBy('createdAt', descending: true) 
           .snapshots();
     }
   }
+
+  // --- ANNOUNCEMENTS ---
+
+  Stream<QuerySnapshot> getAnnouncements(String classId) {
+    return _firestore
+        .collection('classes')
+        .doc(classId)
+        .collection('announcements')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  Future<void> createAnnouncement({
+    required String classId,
+    required String title,
+    required String content,
+    required String teacherId,
+  }) async {
+    await _firestore
+        .collection('classes')
+        .doc(classId)
+        .collection('announcements')
+        .add({
+      'title': title,
+      'content': content,
+      'teacherId': teacherId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> deleteAnnouncement(String classId, String announcementId) async {
+    await _firestore
+        .collection('classes')
+        .doc(classId)
+        .collection('announcements')
+        .doc(announcementId)
+        .delete();
+  }
+
+  // --- STUDENTS ---
+
+  // Fetch full user details for students in a class
+  Future<List<Map<String, dynamic>>> getClassStudents(String classId) async {
+    try {
+      final classDoc = await _firestore.collection('classes').doc(classId).get();
+      if (!classDoc.exists) return [];
+
+      final List<dynamic> studentIds = classDoc.data()?['studentIds'] ?? [];
+      if (studentIds.isEmpty) return [];
+
+      // Firestore 'in' query supports max 10 items. For more, we need to batch or loop.
+      // For simplicity in this migration, we'll loop if > 10, or just fetch all users (not efficient but works for small apps)
+      // Better approach: Fetch users by ID individually or in batches.
+      
+      List<Map<String, dynamic>> students = [];
+      
+      // Batching by 10
+      for (var i = 0; i < studentIds.length; i += 10) {
+        final end = (i + 10 < studentIds.length) ? i + 10 : studentIds.length;
+        final batch = studentIds.sublist(i, end);
+        
+        final query = await _firestore
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: batch)
+            .get();
+            
+        for (var doc in query.docs) {
+          students.add({...doc.data(), 'uid': doc.id});
+        }
+      }
+      
+      return students;
+    } catch (e) {
+      debugPrint("Error fetching students: $e");
+      return [];
+    }
+  }
+
+  // Update class name
+  Future<void> updateClassName(String classId, String newName) async {
+    await _firestore.collection('classes').doc(classId).update({
+      'className': newName,
+    });
+  }
+
+  // Delete class
+  Future<void> deleteClass(String classId) async {
+    await _firestore.collection('classes').doc(classId).delete();
+  }
+
+  // Leave class (for students)
+  Future<void> leaveClass(String classId, String studentId) async {
+    await _firestore.collection('classes').doc(classId).update({
+      'studentIds': FieldValue.arrayRemove([studentId]),
+    });
+  }
+
+  // Stream version of class document to watch for studentId changes
+  Stream<DocumentSnapshot> getClassStream(String classId) {
+    return _firestore.collection('classes').doc(classId).snapshots();
+  }
+
+
 }

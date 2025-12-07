@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:attendance_management_system_vtys/features/attendance/providers/attendance_provider.dart';
 import 'package:attendance_management_system_vtys/features/classroom/screens/documents_screen.dart';
+import 'package:attendance_management_system_vtys/features/attendance/screens/teacher_attendance_screen.dart';
+import 'attendance_history_screen.dart';
 
 class AcademicClassDetailScreen extends ConsumerWidget {
   final String className;
@@ -50,17 +52,11 @@ class AcademicClassDetailScreen extends ConsumerWidget {
                               ? null
                               : () async {
                                   try {
-                                    if (hasActiveSession) {
-                                      await ref
-                                          .read(attendanceControllerProvider.notifier)
-                                          .stopSession(classId: classId, sessionId: activeSessionId!);
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Yoklama Bitirildi')),
-                                        );
-                                      }
-                                    } else {
-                                      await ref
+                                    String? targetSessionId = activeSessionId;
+                                    
+                                    if (!hasActiveSession) {
+                                      // Start new session
+                                      targetSessionId = await ref
                                           .read(attendanceControllerProvider.notifier)
                                           .startSession(classId: classId);
                                       if (context.mounted) {
@@ -68,6 +64,20 @@ class AcademicClassDetailScreen extends ConsumerWidget {
                                           const SnackBar(content: Text('Yoklama Başlatıldı')),
                                         );
                                       }
+                                    }
+
+                                    // Navigate to TeacherAttendanceScreen
+                                    if (context.mounted && targetSessionId != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => TeacherAttendanceScreen(
+                                            classId: classId,
+                                            className: className,
+                                            sessionId: targetSessionId!,
+                                          ),
+                                        ),
+                                      );
                                     }
                                   } catch (e) {
                                     if (context.mounted) {
@@ -79,12 +89,32 @@ class AcademicClassDetailScreen extends ConsumerWidget {
                                 },
                           icon: isLoading
                               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : Icon(hasActiveSession ? Icons.stop : Icons.timer),
-                          label: Text(hasActiveSession ? 'Yoklamayı Bitir' : 'Yoklamayı Başlat'),
+                              : Icon(hasActiveSession ? Icons.sensors : Icons.play_arrow),
+                          label: Text(hasActiveSession ? 'Canlı Oturumu İzle' : 'Yoklamayı Başlat'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: hasActiveSession ? Colors.red : Colors.green,
+                            backgroundColor: hasActiveSession ? Colors.orange : Colors.green,
                             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
                             textStyle: const TextStyle(fontSize: 18),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // 1.1 History Button (New)
+                        OutlinedButton.icon(
+                          onPressed: () {
+                             Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AttendanceHistoryScreen(
+                                  classId: classId,
+                                  className: className,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.history),
+                          label: const Text('Yoklama Geçmişi'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
                           ),
                         ),
                         const SizedBox(height: 16),

@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import '../../../core/utils/snackbar_utils.dart';
+import '../../../core/widgets/custom_transparent_appbar.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -55,43 +56,13 @@ class _CameraScreenState extends State<CameraScreen> {
 
     try {
       final image = await _controller!.takePicture();
-      final file = File(image.path);
-
-      // Face Detection
-      final inputImage = InputImage.fromFile(file);
-      final faceDetector = FaceDetector(
-        options: FaceDetectorOptions(
-          enableContours: false,
-          enableClassification: false,
-        ),
-      );
-
-      final faces = await faceDetector.processImage(inputImage);
-      await faceDetector.close();
-
-      if (faces.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Yüz bulunamadı! Lütfen yüzünüzü net bir şekilde gösterin.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          Navigator.of(context).pop(file);
-        }
+      if (mounted) {
+        Navigator.pop(context, File(image.path));
       }
     } catch (e) {
-      debugPrint('Error taking picture: $e');
+      debugPrint('Camera error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
+        SnackbarUtils.showError(context, "Hata: $e");
         setState(() {
           _isProcessing = false;
         });
@@ -102,17 +73,20 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Yüz Doğrulama')),
+      extendBodyBehindAppBar: true,
+      appBar: const CustomTransparentAppBar(titleText: 'Yüz Doğrulama'),
       body: FutureBuilder<void>(
         future: _initializeControllerFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             return Stack(
               children: [
+                // 1. Camera Preview
                 SizedBox.expand(
                   child: CameraPreview(_controller!),
                 ),
-                // Overlay guide
+                
+                // 2. Overlay guide
                 Center(
                   child: Container(
                     width: 300,
@@ -123,6 +97,32 @@ class _CameraScreenState extends State<CameraScreen> {
                     ),
                   ),
                 ),
+
+                // 3. UI Elements (Button)
+                SafeArea(
+                  child: Column(
+                    children: [
+                      const Spacer(),
+                      
+                      // Bottom Button
+                      Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _isProcessing ? null : _takePicture,
+                            icon: const Icon(Icons.camera_alt),
+                            label: Text(_isProcessing ? 'İşleniyor...' : 'Çek'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
                 if (_isProcessing)
                   const Center(
                     child: CircularProgressIndicator(),
@@ -134,11 +134,6 @@ class _CameraScreenState extends State<CameraScreen> {
           }
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _takePicture,
-        child: const Icon(Icons.camera),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }
