@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/classroom_provider.dart';
+import '../../../../core/utils/snackbar_utils.dart';
 
 class JoinClassDialog extends ConsumerStatefulWidget {
   const JoinClassDialog({super.key});
@@ -19,6 +20,7 @@ class _JoinClassDialogState extends ConsumerState<JoinClassDialog> {
     super.dispose();
   }
 
+
   Future<void> _joinClass() async {
     if (_formKey.currentState!.validate()) {
       try {
@@ -27,23 +29,12 @@ class _JoinClassDialogState extends ConsumerState<JoinClassDialog> {
         );
         if (mounted) {
           Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Derse başarıyla katıldınız'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackbarUtils.showSuccess(context, 'Derse başarıyla katıldınız');
         }
       } catch (e) {
         if (mounted) {
-          // Extract message from Exception if possible
           final message = e.toString().replaceAll('Exception: ', '');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackbarUtils.showError(context, message);
         }
       }
     }
@@ -56,17 +47,22 @@ class _JoinClassDialogState extends ConsumerState<JoinClassDialog> {
 
     return AlertDialog(
       title: const Text('Derse Katıl'),
-      content: Form(
-        key: _formKey,
-        child: TextFormField(
-          controller: _codeController,
-          decoration: const InputDecoration(
-            labelText: 'Ders Kodu',
-            hintText: 'Örn: X9A2B1',
-            border: OutlineInputBorder(),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: TextFormField(
+              controller: _codeController,
+              decoration: const InputDecoration(
+                labelText: 'Ders Kodu',
+                hintText: 'Örn: X9A2B1',
+                border: OutlineInputBorder(),
+              ),
+              textCapitalization: TextCapitalization.characters,
+              validator: (value) => value == null || value.isEmpty ? 'Kod gerekli' : null,
+            ),
           ),
-          textCapitalization: TextCapitalization.characters,
-          validator: (value) => value == null || value.isEmpty ? 'Kod gerekli' : null,
         ),
       ),
       actions: [

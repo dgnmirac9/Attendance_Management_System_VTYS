@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/auth_controller.dart';
+import '../../auth/providers/auth_controller.dart';
 import 'register_screen.dart';
-import '../../classroom/screens/home_screen.dart';
+import '../../../core/utils/snackbar_utils.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -12,9 +12,11 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -23,118 +25,136 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _login() async {
+  void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      await ref.read(authControllerProvider.notifier).login(
-            _emailController.text,
-            _passwordController.text,
-          );
+      try {
+        await ref.read(authControllerProvider.notifier).signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+        // Navigation is handled by AuthWrapper
+      } catch (e) {
+        if (mounted) {
+          String message = "Giriş hatası: $e";
+          if (e.toString().contains('network')) {
+            message = "İnternet bağlantısı yok. Lütfen kontrol edin.";
+          } else if (e.toString().contains('invalid-credential')) {
+             message = "E-posta veya şifre hatalı.";
+          }
+          SnackbarUtils.showError(context, message);
+        }
+      }
     }
+  }
+
+  String? validateEmail(String? value) {
+    if (value == null || value.isEmpty) return 'E-posta gerekli';
+    if (!value.contains('@')) return 'Geçersiz e-posta';
+    return null;
+  }
+
+  String? validatePassword(String? value) {
+    if (value == null || value.isEmpty) return 'Şifre gerekli';
+    if (value.length < 6) return 'Şifre en az 6 karakter olmalı';
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<void>>(authControllerProvider, (previous, next) {
-      next.whenOrNull(
-        error: (error, stackTrace) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error.toString()),
-              backgroundColor: Colors.red,
-            ),
-          );
-        },
-      );
-    });
-
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('C-Lens'),
+      ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Icon(
-                  Icons.school,
-                  size: 100,
-                  color: Colors.deepPurple,
-                ),
-                const SizedBox(height: 32),
-                Text(
-                  'Fırat Üniversitesi\nYoklama Sistemi',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.deepPurple,
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              color: Theme.of(context).cardColor, 
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // --- LOGO ---
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.person,
+                          size: 48,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
-                ),
-                const SizedBox(height: 48),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'E-posta',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Lütfen e-posta giriniz';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Şifre',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Lütfen şifre giriniz';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: isLoading ? null : _login,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                      const SizedBox(height: 24),
+                      Text(
+                        'Giriş Yap',
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'E-posta',
+                          prefixIcon: Icon(Icons.email),
+                        ),
+                        validator: validateEmail, 
+                      ),
+                      const SizedBox(height: 16),
+
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        decoration: InputDecoration(
+                          labelText: 'Şifre',
+                          prefixIcon: const Icon(Icons.lock),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                           ),
-                        )
-                      : const Text('Giriş Yap', style: TextStyle(fontSize: 16)),
+                        ),
+                        validator: validatePassword,
+                      ),
+                      const SizedBox(height: 32),
+
+                      ElevatedButton(
+                        onPressed: isLoading ? null : _handleLogin, 
+                        child: isLoading
+                            ? const SizedBox(
+                                height: 24, width: 24,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Text('Giriş Yap'),
+                      ),
+                      const SizedBox(height: 16),
+
+                      TextButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                        ),
+                        child: const Text('Hesabın yok mu? Kayıt Ol'),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: isLoading
-                      ? null
-                      : () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                          );
-                        },
-                  child: const Text('Hesabın yok mu? Kayıt Ol'),
-                ),
-              ],
+              ),
             ),
           ),
         ),

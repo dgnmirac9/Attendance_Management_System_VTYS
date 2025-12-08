@@ -51,19 +51,18 @@ class AcademicHomeScreen extends ConsumerWidget {
           ),
           Expanded(
             child: classesAsync.when(
-              data: (snapshot) {
-                if (snapshot.docs.isEmpty) {
+              data: (classes) {
+                if (classes.isEmpty) {
                   return const Center(child: Text("Henüz ders oluşturmadınız."));
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.all(16.0),
-                  itemCount: snapshot.docs.length,
+                  itemCount: classes.length,
                   itemBuilder: (context, index) {
-                    final doc = snapshot.docs[index];
-                    final data = doc.data() as Map<String, dynamic>;
-                    final className = data['className'] ?? 'İsimsiz Ders';
-                    final joinCode = data['joinCode'] ?? '---';
-                    final studentCount = (data['studentIds'] as List?)?.length ?? 0;
+                    final classItem = classes[index];
+                    final className = classItem.className;
+                    final joinCode = classItem.joinCode;
+                    final studentCount = classItem.studentIds.length;
 
                     return Card(
                       elevation: 2,
@@ -81,7 +80,7 @@ class AcademicHomeScreen extends ConsumerWidget {
                             MaterialPageRoute(
                               builder: (context) => AcademicClassDetailScreen(
                                 className: className,
-                                classId: doc.id,
+                                classId: classItem.id,
                               ),
                             ),
                           );

@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/utils/snackbar_utils.dart'; // Import SnackbarUtils
+import '../../../core/widgets/skeleton_list_widget.dart';
 
 class DocumentsScreen extends ConsumerWidget {
   final String classId;
@@ -29,7 +31,7 @@ class DocumentsScreen extends ConsumerWidget {
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const SkeletonListWidget(itemCount: 6);
           }
 
           final docs = snapshot.data?.docs ?? [];
@@ -63,9 +65,7 @@ class DocumentsScreen extends ConsumerWidget {
                       await launchUrl(uri, mode: LaunchMode.externalApplication);
                     } else {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Dosya açılamadı')),
-                        );
+                        SnackbarUtils.showError(context, 'Dosya açılamadı');
                       }
                     }
                   },
@@ -86,9 +86,7 @@ class DocumentsScreen extends ConsumerWidget {
 
                   if (user != null) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Yükleniyor...')),
-                      );
+                      SnackbarUtils.showInfo(context, 'Yükleniyor...');
                     }
 
                     try {
@@ -98,15 +96,11 @@ class DocumentsScreen extends ConsumerWidget {
                         uploadedBy: user.uid,
                       );
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Doküman yüklendi!')),
-                        );
+                        SnackbarUtils.showSuccess(context, 'Doküman yüklendi!');
                       }
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Hata: $e')),
-                        );
+                        SnackbarUtils.showError(context, 'Hata: $e');
                       }
                     }
                   }

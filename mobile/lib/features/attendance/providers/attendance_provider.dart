@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../services/attendance_service.dart';
 import '../../auth/providers/auth_controller.dart';
+import '../../../core/constants/firestore_constants.dart';
 
 final attendanceServiceProvider = Provider<AttendanceService>((ref) {
   return AttendanceService();
@@ -38,23 +39,30 @@ final sessionAttendanceProvider = StreamProvider.family<QuerySnapshot, ({String 
   return service.getLiveAttendance(classId: params.classId, sessionId: params.sessionId);
 });
 
+// Stream of class session history
+final classHistoryProvider = StreamProvider.family<QuerySnapshot, String>((ref, classId) {
+  final service = ref.watch(attendanceServiceProvider);
+  return service.getClassHistory(classId);
+});
+
 class AttendanceController extends AsyncNotifier<void> {
   @override
   FutureOr<void> build() {
     // No initial state
   }
 
-  Future<void> startSession({required String classId}) async {
+  Future<String> startSession({required String classId}) async {
     state = const AsyncValue.loading();
     try {
       final user = ref.read(authStateChangesProvider).value;
       if (user == null) throw Exception("Kullanıcı oturumu açık değil");
 
-      await ref.read(attendanceServiceProvider).startSession(
+      final sessionId = await ref.read(attendanceServiceProvider).startSession(
         classId: classId,
         userId: user.uid,
       );
       state = const AsyncValue.data(null);
+      return sessionId;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       rethrow;
@@ -95,11 +103,11 @@ class AttendanceController extends AsyncNotifier<void> {
 
       // 2. Save Record
       await FirebaseFirestore.instance
-          .collection('classes')
+          .collection(FirestoreConstants.classesCollection)
           .doc(classId)
-          .collection('sessions')
+          .collection(FirestoreConstants.sessionsCollection)
           .doc(sessionId)
-          .collection('records')
+          .collection(FirestoreConstants.recordsCollection)
           .doc(user.uid)
           .set({
         'studentId': user.uid,
@@ -107,6 +115,65 @@ class AttendanceController extends AsyncNotifier<void> {
         'photoUrl': photoUrl,
         'status': 'present',
       });
+
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  Future<void> markAttendanceWithQr({
+    required String classId,
+    required String sessionId,
+    required String scannedCode,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final user = ref.read(authStateChangesProvider).value;
+      if (user == null) throw Exception("Kullanıcı oturumu açık değil");
+
+      await ref.read(attendanceServiceProvider).markAttendanceWithQr(
+        classId: classId,
+        sessionId: sessionId,
+        scannedCode: scannedCode,
+        userId: user.uid,
+      );
+
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  Future<void> markAttendanceWithQrAndFace({
+    required String classId,
+    required String sessionId,
+    required String scannedCode,
+    required File photo,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final user = ref.read(authStateChangesProvider).value;
+      if (user == null) throw Exception("Kullanıcı oturumu açık değil");
+
+      // 1. Upload Photo
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('attendance_proofs/$classId/$sessionId/${user.uid}_qr.jpg');
+      
+      await storageRef.putFile(photo);
+      final photoUrl = await storageRef.getDownloadURL();
+
+      // 2. Call Service
+      await ref.read(attendanceServiceProvider).markAttendanceWithQrAndFace(
+        classId: classId,
+        sessionId: sessionId,
+        scannedCode: scannedCode,
+        userId: user.uid,
+        photoUrl: photoUrl,
+      );
 
       state = const AsyncValue.data(null);
     } catch (e, st) {

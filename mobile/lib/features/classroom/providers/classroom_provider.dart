@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../services/classroom_service.dart';
 import '../../auth/providers/auth_controller.dart';
+import '../models/class_model.dart';
 
 final classroomServiceProvider = Provider<ClassroomService>((ref) {
   return ClassroomService();
 });
 
-final userClassesProvider = StreamProvider<QuerySnapshot>((ref) {
+final userClassesProvider = StreamProvider<List<ClassModel>>((ref) {
   final user = ref.watch(authStateChangesProvider).value;
   final roleAsync = ref.watch(userRoleProvider);
 
