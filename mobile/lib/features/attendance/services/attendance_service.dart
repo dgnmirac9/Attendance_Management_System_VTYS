@@ -1,5 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/firestore_constants.dart';
+import '../../auth/models/user_model.dart';
+
+final attendanceServiceProvider = Provider((ref) => AttendanceService());
 
 class AttendanceService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -8,9 +13,9 @@ class AttendanceService {
   Future<String> startSession({required String classId, required String userId}) async {
     try {
       final docRef = await _firestore
-          .collection('classes')
+          .collection(FirestoreConstants.classesCollection)
           .doc(classId)
-          .collection('sessions')
+          .collection(FirestoreConstants.sessionsCollection)
           .add({
         'startTime': FieldValue.serverTimestamp(),
         'isActive': true,
@@ -27,9 +32,9 @@ class AttendanceService {
   Future<void> stopSession({required String classId, required String sessionId}) async {
     try {
       await _firestore
-          .collection('classes')
+          .collection(FirestoreConstants.classesCollection)
           .doc(classId)
-          .collection('sessions')
+          .collection(FirestoreConstants.sessionsCollection)
           .doc(sessionId)
           .update({
         'isActive': false,
@@ -46,23 +51,22 @@ class AttendanceService {
   Future<void> updateSessionQrCode({required String classId, required String sessionId, required String qrCode}) async {
     try {
       await _firestore
-          .collection('classes')
+          .collection(FirestoreConstants.classesCollection)
           .doc(classId)
-          .collection('sessions')
+          .collection(FirestoreConstants.sessionsCollection)
           .doc(sessionId)
           .update({'currentQrCode': qrCode});
     } catch (e) {
       debugPrint('Error updating QR code: $e');
-      // Don't rethrow, just log, to not interrupt timer
     }
   }
 
   // Listen to the active session for a specific class
   Stream<QuerySnapshot> getActiveSession(String classId) {
     return _firestore
-        .collection('classes')
+        .collection(FirestoreConstants.classesCollection)
         .doc(classId)
-        .collection('sessions')
+        .collection(FirestoreConstants.sessionsCollection)
         .where('isActive', isEqualTo: true)
         .limit(1)
         .snapshots();
@@ -75,11 +79,11 @@ class AttendanceService {
     required String userId,
   }) {
     return _firestore
-        .collection('classes')
+        .collection(FirestoreConstants.classesCollection)
         .doc(classId)
-        .collection('sessions')
+        .collection(FirestoreConstants.sessionsCollection)
         .doc(sessionId)
-        .collection('records')
+        .collection(FirestoreConstants.recordsCollection)
         .doc(userId)
         .snapshots();
   }
@@ -90,11 +94,11 @@ class AttendanceService {
     required String sessionId,
   }) {
     return _firestore
-        .collection('classes')
+        .collection(FirestoreConstants.classesCollection)
         .doc(classId)
-        .collection('sessions')
+        .collection(FirestoreConstants.sessionsCollection)
         .doc(sessionId)
-        .collection('records')
+        .collection(FirestoreConstants.recordsCollection)
         .orderBy('timestamp', descending: true)
         .snapshots();
   }
@@ -102,18 +106,19 @@ class AttendanceService {
   // Get all sessions (history) for a class
   Stream<QuerySnapshot> getClassHistory(String classId) {
     return _firestore
-        .collection('classes')
+        .collection(FirestoreConstants.classesCollection)
         .doc(classId)
-        .collection('sessions')
+        .collection(FirestoreConstants.sessionsCollection)
         .orderBy('startTime', descending: true)
         .snapshots();
   }
 
+
   // Get users by IDs
-  Future<List<Map<String, dynamic>>> getUsersByIds(List<String> userIds) async {
+  Future<List<UserModel>> getUsersByIds(List<String> userIds) async {
     if (userIds.isEmpty) return [];
     
-    List<Map<String, dynamic>> users = [];
+    List<UserModel> users = [];
     
     // Batching by 10
     for (var i = 0; i < userIds.length; i += 10) {
@@ -121,12 +126,12 @@ class AttendanceService {
       final batch = userIds.sublist(i, end);
       
       final query = await _firestore
-          .collection('users')
+          .collection(FirestoreConstants.usersCollection)
           .where(FieldPath.documentId, whereIn: batch)
           .get();
           
       for (var doc in query.docs) {
-        users.add({...doc.data(), 'uid': doc.id});
+        users.add(UserModel.fromMap(doc.data(), doc.id));
       }
     }
     
@@ -136,9 +141,9 @@ class AttendanceService {
   // Delete attendance session
   Future<void> deleteAttendanceSession(String classId, String sessionId) async {
     await _firestore
-        .collection('classes')
+        .collection(FirestoreConstants.classesCollection)
         .doc(classId)
-        .collection('sessions')
+        .collection(FirestoreConstants.sessionsCollection)
         .doc(sessionId)
         .delete();
   }
@@ -152,9 +157,9 @@ class AttendanceService {
   }) async {
     return _firestore.runTransaction((transaction) async {
       final sessionRef = _firestore
-          .collection('classes')
+          .collection(FirestoreConstants.classesCollection)
           .doc(classId)
-          .collection('sessions')
+          .collection(FirestoreConstants.sessionsCollection)
           .doc(sessionId);
 
       final sessionDoc = await transaction.get(sessionRef);
@@ -177,7 +182,7 @@ class AttendanceService {
       }
 
       // 3. Mark Attendance
-      final recordRef = sessionRef.collection('records').doc(userId);
+      final recordRef = sessionRef.collection(FirestoreConstants.recordsCollection).doc(userId);
       
       transaction.set(recordRef, {
         'studentId': userId,
@@ -198,9 +203,9 @@ class AttendanceService {
   }) async {
     return _firestore.runTransaction((transaction) async {
       final sessionRef = _firestore
-          .collection('classes')
+          .collection(FirestoreConstants.classesCollection)
           .doc(classId)
-          .collection('sessions')
+          .collection(FirestoreConstants.sessionsCollection)
           .doc(sessionId);
 
       final sessionDoc = await transaction.get(sessionRef);
@@ -223,7 +228,7 @@ class AttendanceService {
       }
 
       // 3. Mark Attendance with Photo Proof
-      final recordRef = sessionRef.collection('records').doc(userId);
+      final recordRef = sessionRef.collection(FirestoreConstants.recordsCollection).doc(userId);
       
       transaction.set(recordRef, {
         'studentId': userId,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,6 +19,7 @@ import 'dart:io';
 import '../../attendance/screens/qr_scanner_screen.dart';
 import '../../attendance/screens/camera_screen.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/skeleton_list_widget.dart';
 import '../../../core/widgets/custom_confirm_dialog.dart';
 
 class ClassDetailScreen extends ConsumerStatefulWidget {
@@ -52,12 +54,12 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     
     // Determine if user is teacher based on class data or global auth state
     // For now, let's check if the current user is the teacher of this class
-    final isTeacher = classDetailsAsync.value?.data() != null 
-        ? (classDetailsAsync.value!.data() as Map<String, dynamic>)['teacherId'] == _currentUid
+    final isTeacher = classDetailsAsync.value != null 
+        ? classDetailsAsync.value!.teacherId == _currentUid
         : false;
 
-    final teacherName = classDetailsAsync.value?.data() != null
-        ? (classDetailsAsync.value!.data() as Map<String, dynamic>)['teacherName'] ?? 'Bilinmiyor'
+    final teacherName = classDetailsAsync.value != null
+        ? classDetailsAsync.value!.teacherName
         : 'Yükleniyor...';
 
     return Scaffold(
@@ -78,8 +80,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Color(0xFF2E3192),
-                          Color(0xFF1BFFFF),
+                          AppTheme.gradientStart,
+                          AppTheme.gradientEnd,
                         ],
                       ),
                     ),
@@ -140,9 +142,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                             isScrollControlled: true,
                             backgroundColor: Colors.transparent,
                             builder: (context) {
-                              final currentClassName = classDetailsAsync.value?.data() != null 
-                                  ? (classDetailsAsync.value!.data() as Map<String, dynamic>)['className'] as String? ?? widget.className
-                                  : widget.className;
+                              final currentClassName = classDetailsAsync.value?.className ?? widget.className;
                                   
                               return ClassSettingsBottomSheet(
                                 className: currentClassName,
@@ -166,9 +166,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          classDetailsAsync.value?.data() != null 
-                              ? (classDetailsAsync.value!.data() as Map<String, dynamic>)['className'] as String? ?? widget.className
-                              : widget.className,
+                          classDetailsAsync.value?.className ?? widget.className,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -486,7 +484,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonListWidget(itemCount: 3),
       error: (e, s) => Center(child: Text('Hata: $e')),
     );
   }
@@ -509,9 +507,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           itemCount: students.length,
           itemBuilder: (context, index) {
             final student = students[index];
-            final name = student['name'] ?? 'İsimsiz';
-            // Use studentNo if available, otherwise email
-            final studentInfo = student['studentId'] ?? student['studentNo'] ?? student['email'] ?? '';
+            final name = student.name;
+            final studentInfo = student.studentNo ?? student.email;
 
             return Card(
               margin: const EdgeInsets.only(bottom: 16),
@@ -531,7 +528,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                     children: [
                       // Avatar
                       CircleAvatar(
-                        backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                        backgroundColor: theme.colorScheme.primaryContainer,
                         child: Text(
                           name.isNotEmpty ? name[0].toUpperCase() : '?',
                           style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
@@ -572,7 +569,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonListWidget(itemCount: 5),
       error: (e, s) => Center(child: Text('Hata: $e')),
     );
   }
@@ -624,7 +621,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonListWidget(itemCount: 4),
       error: (e, s) => Center(child: Text('Hata: $e')),
     );
   }
@@ -744,7 +741,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                      decoration: BoxDecoration(
                        color: isPresent 
-                           ? const Color(0xFFE8F5E9) // Keep Green for Presence
+                           ? AppTheme.success.withValues(alpha: 0.1) // Keep Green for Presence
                            : theme.colorScheme.errorContainer, // Use ErrorContainer (Pink-ish) for Absence
                        borderRadius: BorderRadius.circular(20),
                      ),
@@ -753,14 +750,14 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                          Icon(
                            isPresent ? Icons.check_circle : Icons.cancel,
                            size: 16,
-                           color: isPresent ? Colors.green : theme.colorScheme.onErrorContainer,
+                           color: isPresent ? AppTheme.success : theme.colorScheme.onErrorContainer,
                          ),
                          const SizedBox(width: 6),
                          Text(
                            isPresent ? "VAR" : "YOK",
                            style: TextStyle(
                              fontWeight: FontWeight.bold,
-                             color: isPresent ? Colors.green : theme.colorScheme.onErrorContainer,
+                             color: isPresent ? AppTheme.success : theme.colorScheme.onErrorContainer,
                              fontSize: 12,
                            ),
                          ),

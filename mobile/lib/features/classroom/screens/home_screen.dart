@@ -13,6 +13,7 @@ import 'class_detail_screen.dart';
 import '../widgets/create_class_dialog.dart';
 import '../widgets/profile_menu_sheet.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/skeleton_list_widget.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -29,7 +30,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final userDataAsync = ref.watch(userDataProvider); // Watch user data
     final user = FirebaseAuth.instance.currentUser;
     final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
+
 
     return Scaffold(
       appBar: AppBar(
@@ -53,11 +54,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: primaryColor.withValues(alpha: 0.1),
+                  color: theme.colorScheme.primaryContainer,
                   shape: BoxShape.circle,
-                  border: Border.all(color: primaryColor.withValues(alpha: 0.5), width: 1),
+                  border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2), width: 1),
                 ),
-                child: Icon(Icons.face, color: primaryColor, size: 24),
+                child: Icon(Icons.face, color: theme.colorScheme.primary, size: 24),
               ),
             ),
           ),
@@ -112,16 +113,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               }
             },
             itemBuilder: (context, index) {
-              final doc = classes[index];
-              final data = doc.data() as Map<String, dynamic>;
-              final className = data['className'] ?? 'İsimsiz Sınıf';
-              final teacherName = data['teacherName'] ?? '';
-              final joinCode = data['joinCode'] ?? '';
+              final classItem = classes[index];
+              final className = classItem.className;
+              final teacherName = classItem.teacherName;
+              final joinCode = classItem.joinCode;
               // Random accent color based on hash or stored field
-              final accentColor = Colors.primaries[doc.id.hashCode % Colors.primaries.length];
+              final accentColor = Colors.primaries[classItem.id.hashCode % Colors.primaries.length];
 
               return Padding(
-                key: ValueKey(doc.id),
+                key: ValueKey(classItem.id),
                 padding: const EdgeInsets.only(bottom: 16.0),
                 child: Card(
                   margin: EdgeInsets.zero,
@@ -133,7 +133,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         MaterialPageRoute(
                           builder: (context) => ClassDetailScreen(
                             className: className,
-                            classId: doc.id,
+                            classId: classItem.id,
                             joinCode: joinCode,
                           ),
                         ),
@@ -180,7 +180,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 Icon(Icons.people, size: 18, color: Colors.grey[600]),
                                 const SizedBox(width: 4),
                                 Text(
-                                  "${(data['studentIds'] as List?)?.length ?? 0}",
+                                  "${classItem.studentIds.length}",
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: Colors.grey[800],
                                     fontWeight: FontWeight.bold,
@@ -198,7 +198,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonListWidget(),
         error: (e, s) => Center(child: Text('Hata: $e')),
       ),
       floatingActionButton: FloatingActionButton(

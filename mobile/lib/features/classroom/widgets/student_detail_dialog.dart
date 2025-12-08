@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../auth/models/user_model.dart';
 class StudentDetailDialog extends StatelessWidget {
-  final Map<String, dynamic> studentData;
+  final UserModel studentData;
 
   const StudentDetailDialog({super.key, required this.studentData});
 
@@ -11,13 +12,13 @@ class StudentDetailDialog extends StatelessWidget {
     final primaryColor = theme.colorScheme.primary;
 
     // Fallback logic if firstName/lastName are missing (old users)
-    final rawName = studentData['name'] as String? ?? '';
+    final rawName = studentData.name;
     final nameParts = rawName.split(' ');
     
-    final firstName = studentData['firstName'] ?? (nameParts.isNotEmpty ? nameParts.first : 'İsimsiz');
-    final lastName = studentData['lastName'] ?? (nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '');
-    final email = studentData['email'] ?? 'E-posta yok';
-    final studentNo = studentData['studentId'] ?? studentData['studentNo'] ?? 'Numara Yok';
+    final firstName = studentData.firstName ?? (nameParts.isNotEmpty ? nameParts.first : 'İsimsiz');
+    final lastName = studentData.lastName ?? (nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '');
+    final email = studentData.email;
+    final studentNo = studentData.studentNo ?? 'Numara Yok';
     final fullName = "$firstName $lastName";
 
     return Dialog(

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/constants/firestore_constants.dart';
+
 import '../../classroom/screens/home_screen.dart';
 import 'login_screen.dart';
 
@@ -30,7 +32,7 @@ class AuthWrapper extends StatelessWidget {
         // We could listen to role here, but HomeScreen handles data fetching.
         // We just need to ensure the user doc exists or handle it gracefully.
         return StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+          stream: FirebaseFirestore.instance.collection(FirestoreConstants.usersCollection).doc(user.uid).snapshots(),
           builder: (context, userSnapshot) {
             if (userSnapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(body: Center(child: CircularProgressIndicator()));

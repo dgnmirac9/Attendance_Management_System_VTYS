@@ -18,6 +18,15 @@ class AppTheme {
 
   static const Color _darkTextPrimary = Colors.white; // Yazı her zaman Beyaz
 
+  // --- SEMANTİK RENKLER (Public) ---
+  static const Color success = Color(0xFF4CAF50);
+  static const Color warning = Color(0xFFFFC107);
+  static const Color error = Color(0xFFD32F2F);
+  
+  // --- ÖZEL GRADIENTLER ---
+  static const Color gradientStart = Color(0xFF2E3192);
+  static const Color gradientEnd = Color(0xFF1BFFFF);
+
 
   // ===========================================================================
   // AÇIK TEMA (Light)
@@ -29,6 +38,8 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(
         seedColor: _lightPrimary,
         primary: _lightPrimary,
+        primaryContainer: Color(0xFFBBDEFB), // Blue 100 for better contrast against white cards
+        onPrimaryContainer: _lightTextPrimary,
         surface: _lightSurface,
         onSurface: _lightTextPrimary,
         error: const Color(0xFFDC2626),
@@ -90,6 +101,8 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(
         seedColor: _darkPrimary,
         primary: _darkPrimary,
+        primaryContainer: Color(0xFF1E293B),
+        onPrimaryContainer: _darkPrimary,
         surface: _darkSurface,
         onSurface: _darkTextPrimary,
         brightness: Brightness.dark,

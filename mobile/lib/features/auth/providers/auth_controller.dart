@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/user_service.dart';
+import '../../../core/constants/firestore_constants.dart';
 
 class AuthController extends StateNotifier<AsyncValue<void>> {
   final UserService _userService;
@@ -75,6 +76,9 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
         if (role == 'student' && studentNo != null) {
            await _userService.updateStudentId(userCredential.user!.uid, studentNo);
         }
+
+        // Prevent auto-login: Sign out immediately
+        await FirebaseAuth.instance.signOut();
 
       state = const AsyncValue.data(null);
     } on FirebaseAuthException catch (e) {
@@ -157,10 +161,12 @@ final authStateChangesProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges();
 });
 
+
+
 final userDataProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
   final authState = ref.watch(authStateChangesProvider);
   if (authState.value?.uid == null) return null;
   
-  final doc = await FirebaseFirestore.instance.collection('users').doc(authState.value!.uid).get();
+  final doc = await FirebaseFirestore.instance.collection(FirestoreConstants.usersCollection).doc(authState.value!.uid).get();
   return doc.data();
 });

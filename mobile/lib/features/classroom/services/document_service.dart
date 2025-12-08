@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../core/constants/firestore_constants.dart';
+
 class DocumentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -28,7 +30,11 @@ class DocumentService {
       final downloadUrl = await storageRef.getDownloadURL();
 
       // Save metadata to Firestore
-      await _firestore.collection('classes').doc(classId).collection('documents').add({
+      await _firestore
+          .collection(FirestoreConstants.classesCollection)
+          .doc(classId)
+          .collection(FirestoreConstants.documentsCollection)
+          .add({
         'name': fileName,
         'url': downloadUrl,
         'type': file.extension,
@@ -45,9 +51,9 @@ class DocumentService {
   // Get stream of documents for a class
   Stream<QuerySnapshot> getDocuments(String classId) {
     return _firestore
-        .collection('classes')
+        .collection(FirestoreConstants.classesCollection)
         .doc(classId)
-        .collection('documents')
+        .collection(FirestoreConstants.documentsCollection)
         .orderBy('uploadedAt', descending: true)
         .snapshots();
   }

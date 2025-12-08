@@ -5,6 +5,8 @@ import '../../auth/providers/auth_controller.dart';
 import '../../auth/screens/edit_profile_screen.dart';
 import '../../auth/screens/face_capture_screen.dart';
 
+import '../../../../core/theme/app_theme.dart';
+
 class ProfileMenuSheet extends ConsumerWidget {
   final bool isTeacher;
   final String userName;
@@ -14,13 +16,12 @@ class ProfileMenuSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-
     final isDarkMode = theme.brightness == Brightness.dark;
 
-    // Color Palette
-    final backgroundColor = isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFE3F2FD); // Light Blue 50
-    final cardColor = isDarkMode ? theme.cardColor : const Color(0xFFBBDEFB); // Blue 100
-    final menuButtonColor = isDarkMode ? theme.cardColor : Colors.white;
+    // Use Theme colors
+    final backgroundColor = theme.scaffoldBackgroundColor;
+
+    final menuButtonColor = isDarkMode ? theme.colorScheme.surface : Colors.white;
     final primaryColor = theme.colorScheme.primary;
 
     return Container(
@@ -37,7 +38,7 @@ class ProfileMenuSheet extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: cardColor,
+                color: menuButtonColor,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -46,11 +47,11 @@ class ProfileMenuSheet extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: theme.colorScheme.primaryContainer,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2), width: 2),
                     ),
-                    child: Icon(Icons.face, size: 40, color: primaryColor),
+                    child: Icon(Icons.face, size: 40, color: theme.colorScheme.primary),
                   ),
                   const SizedBox(width: 16),
                   
@@ -61,10 +62,9 @@ class ProfileMenuSheet extends ConsumerWidget {
                       children: [
                         Text(
                           userName,
-                          style: TextStyle(
-                            fontSize: 16,
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: isDarkMode ? Colors.white : const Color(0xFF1565C0), // Blue 800
+                            color: isDarkMode ? Colors.white : theme.colorScheme.onPrimaryContainer,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -72,7 +72,7 @@ class ProfileMenuSheet extends ConsumerWidget {
                           isTeacher ? "Öğretim Görevlisi" : "Öğrenci",
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDarkMode ? Colors.white70 : const Color(0xFF1976D2).withValues(alpha: 0.7), // Blue 700
+                            color: isDarkMode ? Colors.white70 : theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -98,8 +98,8 @@ class ProfileMenuSheet extends ConsumerWidget {
               icon: Icons.edit,
               title: 'Bilgilerimi Düzenle',
               backgroundColor: menuButtonColor,
-              iconColor: const Color(0xFF1976D2), // Blue 700
-              textColor: const Color(0xFF0D47A1), // Blue 900
+              iconColor: primaryColor,
+              textColor: primaryColor,
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
@@ -113,8 +113,8 @@ class ProfileMenuSheet extends ConsumerWidget {
                 icon: Icons.face_retouching_natural,
                 title: 'Yüz Verisini Güncelle',
                 backgroundColor: menuButtonColor,
-                iconColor: const Color(0xFF1976D2),
-                textColor: const Color(0xFF0D47A1),
+                iconColor: primaryColor,
+                textColor: primaryColor,
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const FaceCaptureScreen()));
@@ -129,9 +129,9 @@ class ProfileMenuSheet extends ConsumerWidget {
               icon: Icons.logout_rounded,
               title: 'Çıkış Yap',
               backgroundColor: menuButtonColor,
-              iconColor: const Color(0xFFD32F2F), // Red 700
-              textColor: const Color(0xFFC62828), // Red 800
-              isLogout: true,
+              iconColor: AppTheme.error,
+              textColor: AppTheme.error,
+              iconBackgroundColor: AppTheme.error.withValues(alpha: 0.1),
               onTap: () async {
                 Navigator.pop(context);
                 await ref.read(authControllerProvider.notifier).signOut();
@@ -150,13 +150,13 @@ class ProfileMenuSheet extends ConsumerWidget {
     required String title,
     required Color backgroundColor,
     required VoidCallback onTap,
-    Color? iconColor,
-    Color? textColor,
-    bool isLogout = false,
+    required Color iconColor, // Made required for simplicity
+    required Color textColor,
+    Color? iconBackgroundColor,
   }) {
     final theme = Theme.of(context);
-    final borderColor = theme.inputDecorationTheme.enabledBorder?.borderSide.color ?? Colors.grey.shade300;
-    final effectiveBorderColor = isLogout ? const Color(0xFFFFCDD2) : borderColor;
+    // Use theme border or default
+    final borderColor = theme.dividerColor.withValues(alpha: 0.1);
 
     return InkWell(
       onTap: onTap,
@@ -165,7 +165,7 @@ class ProfileMenuSheet extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
           color: backgroundColor,
-          border: Border.all(color: effectiveBorderColor, width: 1.5),
+          border: Border.all(color: borderColor, width: 1.5),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))
@@ -176,7 +176,7 @@ class ProfileMenuSheet extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: (iconColor ?? theme.colorScheme.primary).withValues(alpha: 0.1),
+                color: iconBackgroundColor ?? theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: iconColor, size: 24),
@@ -188,7 +188,7 @@ class ProfileMenuSheet extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 16, 
                   fontWeight: FontWeight.w600, 
-                  color: textColor ?? theme.textTheme.bodyLarge?.color,
+                  color: textColor,
                 ),
               ),
             ),
@@ -220,7 +220,7 @@ class _CustomThemeSwitch extends StatelessWidget {
         height: 32,
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: const Color(0xFFE0E0E0),
+          color: Colors.grey.shade300,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Stack(

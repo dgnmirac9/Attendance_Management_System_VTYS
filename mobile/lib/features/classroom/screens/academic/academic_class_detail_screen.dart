@@ -7,6 +7,9 @@ import 'package:attendance_management_system_vtys/features/classroom/screens/doc
 import 'package:attendance_management_system_vtys/features/attendance/screens/teacher_attendance_screen.dart';
 import 'attendance_history_screen.dart';
 
+import '../../../../core/widgets/skeleton_detail_widget.dart';
+import '../../../../core/widgets/skeleton_list_widget.dart';
+
 class AcademicClassDetailScreen extends ConsumerWidget {
   final String className;
   final String classId;
@@ -188,7 +191,7 @@ class AcademicClassDetailScreen extends ConsumerWidget {
                                   },
                                 );
                               },
-                              loading: () => const Center(child: CircularProgressIndicator()),
+                              loading: () => const SkeletonListWidget(itemCount: 3),
                               error: (e, s) => Center(child: Text('Hata: $e')),
                             );
                           },
@@ -205,7 +208,7 @@ class AcademicClassDetailScreen extends ConsumerWidget {
             ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonDetailWidget(),
         error: (e, s) => Center(child: Text('Hata: $e')),
       ),
     );

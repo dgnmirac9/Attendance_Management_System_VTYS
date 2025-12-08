@@ -7,6 +7,8 @@ import '../../../../core/utils/validators.dart';
 import '../../../../core/utils/snackbar_utils.dart';
 import '../widgets/change_password_dialog.dart';
 
+import '../../../../core/widgets/skeleton_form_widget.dart';
+
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -159,9 +161,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFE3F2FD),
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
+        body: const SkeletonFormWidget(),
       );
     }
 
@@ -259,7 +262,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(9),
                           ],
-                          decoration: const InputDecoration(labelText: 'Öğrenci Numarası', prefixIcon: Icon(Icons.badge)),
+                          maxLength: 9,
+                          decoration: const InputDecoration(labelText: 'Öğrenci Numarası', prefixIcon: Icon(Icons.badge), counterText: ""),
                           validator: (val) {
                             if (val == null || val.isEmpty) return 'Zorunlu';
                             if (val.length != 9) return '9 haneli olmalı';

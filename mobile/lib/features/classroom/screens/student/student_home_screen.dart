@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:ui'; // IMPORANT for ProxyDecorator
 import '../../../auth/providers/auth_controller.dart';
 import '../../providers/classroom_provider.dart';
 import '../../../auth/services/user_service.dart'; // For classOrder update
 import 'join_class_dialog.dart';
 import 'student_class_detail_screen.dart';
+import '../../models/class_model.dart';
 
 class StudentHomeScreen extends ConsumerStatefulWidget {
   const StudentHomeScreen({super.key});
@@ -18,7 +18,7 @@ class StudentHomeScreen extends ConsumerStatefulWidget {
 
 class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   // Local state for optimistic updates
-  List<DocumentSnapshot>? _localClasses;
+  List<ClassModel>? _localClasses;
 
   @override
   Widget build(BuildContext context) {
@@ -48,12 +48,12 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         ],
       ),
       body: classesAsync.when(
-        data: (snapshot) {
+        data: (classes) {
           // Initialize local state once
-          if (_localClasses == null || _localClasses!.length != snapshot.docs.length) {
+          if (_localClasses == null || _localClasses!.length != classes.length) {
              // Basic check to sync. In production, might need more robust sync or separate provider for order.
              // For now we trust the stream order initially.
-             _localClasses = List.from(snapshot.docs);
+             _localClasses = List.from(classes);
           }
 
           if (_localClasses!.isEmpty) {
@@ -73,7 +73,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               });
               
               // Persist order
-              final newOrderIds = _localClasses!.map((doc) => doc.id).toList();
+              final newOrderIds = _localClasses!.map((c) => c.id).toList();
               if (user != null) {
                 UserService().updateClassOrder(user.uid, newOrderIds);
               }
@@ -98,14 +98,13 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
               );
             },
             itemBuilder: (context, index) {
-              final doc = _localClasses![index];
-              final data = doc.data() as Map<String, dynamic>;
-              final className = data['className'] ?? 'İsimsiz Ders';
-              final teacherName = data['teacherName'] ?? 'Bilinmiyor';
+              final classItem = _localClasses![index];
+              final className = classItem.className;
+              final teacherName = classItem.teacherName; // Removed fallback 'Bilinmiyor'; logic inside model handles fallback if needed, but model usually nullable/non-nullable
 
               // Key is mandatory for ReorderableListView
               return Card(
-                key: ValueKey(doc.id), 
+                key: ValueKey(classItem.id), 
                 elevation: 2,
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
@@ -121,7 +120,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                       MaterialPageRoute(
                         builder: (context) => StudentClassDetailScreen(
                           className: className,
-                          classId: doc.id,
+                          classId: classItem.id,
                         ),
                       ),
                     );
@@ -138,7 +137,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
         onPressed: () {
           showDialog(
             context: context,
-            builder: (context) => JoinClassDialog(),
+            builder: (context) => const JoinClassDialog(),
           );
         },
         child: const Icon(Icons.add),

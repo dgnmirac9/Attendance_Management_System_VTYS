@@ -7,6 +7,7 @@ import '../../../core/utils/snackbar_utils.dart'; // Assuming this exists or usi
 import '../providers/attendance_provider.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/custom_confirm_dialog.dart';
+import '../../../core/widgets/skeleton_list_widget.dart';
 
 class TeacherAttendanceScreen extends ConsumerStatefulWidget {
   final String classId;
@@ -233,7 +234,7 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
                 ),
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const SkeletonListWidget(itemCount: 4),
             error: (e, s) => Center(child: Text("Hata: $e")),
           ),
         ],

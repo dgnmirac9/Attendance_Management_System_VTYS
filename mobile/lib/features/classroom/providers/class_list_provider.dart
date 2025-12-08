@@ -4,11 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/services/user_service.dart';
 import '../../auth/providers/auth_controller.dart';
 import 'classroom_provider.dart';
-
-
+import '../models/class_model.dart';
 
 // 1. Raw Classes Stream
-final userClassesStreamProvider = StreamProvider.autoDispose<QuerySnapshot>((ref) {
+final userClassesStreamProvider = StreamProvider.autoDispose<List<ClassModel>>((ref) {
   final authState = ref.watch(authStateChangesProvider);
   final user = authState.value;
   
@@ -30,7 +29,7 @@ final userDataStreamProvider = StreamProvider.autoDispose<DocumentSnapshot>((ref
 });
 
 // 3. Sorted Classes Provider
-final sortedClassesProvider = Provider.autoDispose<AsyncValue<List<QueryDocumentSnapshot>>>((ref) {
+final sortedClassesProvider = Provider.autoDispose<AsyncValue<List<ClassModel>>>((ref) {
   final classesAsync = ref.watch(userClassesStreamProvider);
   final userDataAsync = ref.watch(userDataStreamProvider);
 
@@ -40,7 +39,7 @@ final sortedClassesProvider = Provider.autoDispose<AsyncValue<List<QueryDocument
 
   if (classesAsync.hasError) return AsyncValue.error(classesAsync.error!, classesAsync.stackTrace!);
   
-  final classes = classesAsync.value?.docs ?? [];
+  final classes = classesAsync.value ?? [];
   final userData = userDataAsync.value?.data() as Map<String, dynamic>?;
   final orderList = (userData?['classOrder'] as List<dynamic>?)?.cast<String>() ?? [];
 
@@ -48,16 +47,9 @@ final sortedClassesProvider = Provider.autoDispose<AsyncValue<List<QueryDocument
     return AsyncValue.data(classes);
   }
 
-  // Sort based on orderList (which contains class codes or IDs? Source used 'code'. Mirac uses 'joinCode' or doc ID?)
-  // Source used 'code'. Mirac has 'joinCode'. Let's assume 'joinCode' is the unique identifier visible to users,
-  // but doc ID is safer. The source used 'code' which was the join code.
-  // Let's assume we sort by 'joinCode' if that's what we save.
-  // Wait, in HomeScreen migration I should decide what to save. I'll save 'joinCode' or Doc ID.
-  // Doc ID is better.
-  
-  final sorted = List<QueryDocumentSnapshot>.from(classes);
+  // Sort based on orderList (IDs)
+  final sorted = List<ClassModel>.from(classes);
   sorted.sort((a, b) {
-    // Try to match by ID first, then joinCode
     String idA = a.id;
     String idB = b.id;
     

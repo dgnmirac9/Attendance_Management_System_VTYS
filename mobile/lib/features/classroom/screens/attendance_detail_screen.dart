@@ -7,6 +7,8 @@ import '../widgets/student_detail_dialog.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/custom_confirm_dialog.dart';
 import '../../../core/utils/snackbar_utils.dart';
+import '../../../core/widgets/skeleton_list_widget.dart';
+import '../../auth/models/user_model.dart';
 
 class AttendanceDetailScreen extends ConsumerStatefulWidget {
   final String classCode; // Keeping classCode for compatibility, but using classId for logic if needed
@@ -31,7 +33,7 @@ class AttendanceDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _AttendanceDetailScreenState extends ConsumerState<AttendanceDetailScreen> {
-  List<Map<String, dynamic>> _students = [];
+  List<UserModel> _students = [];
   bool _isLoading = true;
 
   @override
@@ -184,7 +186,7 @@ class _AttendanceDetailScreenState extends ConsumerState<AttendanceDetailScreen>
           // Student List
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const SkeletonListWidget(itemCount: 8)
                 : _students.isEmpty
                     ? const EmptyStateWidget(
                         icon: Icons.person_off,
@@ -195,11 +197,9 @@ class _AttendanceDetailScreenState extends ConsumerState<AttendanceDetailScreen>
                         itemCount: _students.length,
                         itemBuilder: (context, index) {
                           final student = _students[index];
-                          final rawName = student['name'] as String? ?? '';
-                          final nameParts = rawName.split(' ');
-                          
-                          final firstName = student['firstName'] ?? (nameParts.isNotEmpty ? nameParts.first : '?');
-                          final lastName = student['lastName'] ?? (nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '');
+                          final rawName = student.name;
+                          final firstName = student.firstName ?? '?';
+                          final lastName = student.lastName ?? '';
                           final fullName = "$firstName $lastName".trim().isEmpty ? rawName : "$firstName $lastName";
                           
                           return Card(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../attendance/providers/attendance_provider.dart';
+import '../../../../core/constants/firestore_constants.dart';
 import '../attendance_detail_screen.dart';
 
 class AttendanceHistoryScreen extends ConsumerWidget {
@@ -82,12 +83,9 @@ class AttendanceHistoryScreen extends ConsumerWidget {
     );
   }
 
+
+
   void _navigateToDetail(BuildContext context, WidgetRef ref, String classId, String sessionId, DateTime date) {
-    // Show loading or navigate and let screen load.
-    // Since AttendanceDetailScreen requries UIDs immediately, we must fetch or change it.
-    // Changing AttendanceDetailScreen to fetch its own records is cleaner but breaks signature compat.
-    // Let's fetch IDs here quickly.
-    
     showDialog(
       context: context,
       builder: (c) => const Center(child: CircularProgressIndicator()),
@@ -96,11 +94,11 @@ class AttendanceHistoryScreen extends ConsumerWidget {
     
     // Fetch records
     FirebaseFirestore.instance
-      .collection('classes')
+      .collection(FirestoreConstants.classesCollection)
       .doc(classId)
-      .collection('sessions')
+      .collection(FirestoreConstants.sessionsCollection)
       .doc(sessionId)
-      .collection('records')
+      .collection(FirestoreConstants.recordsCollection)
       .get()
       .then((snap) {
         if (context.mounted) {

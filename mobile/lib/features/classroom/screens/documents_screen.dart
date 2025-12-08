@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/utils/snackbar_utils.dart'; // Import SnackbarUtils
+import '../../../core/widgets/skeleton_list_widget.dart';
 
 class DocumentsScreen extends ConsumerWidget {
   final String classId;
@@ -30,7 +31,7 @@ class DocumentsScreen extends ConsumerWidget {
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const SkeletonListWidget(itemCount: 6);
           }
 
           final docs = snapshot.data?.docs ?? [];

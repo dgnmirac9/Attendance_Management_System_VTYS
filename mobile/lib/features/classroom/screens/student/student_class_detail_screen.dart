@@ -5,6 +5,8 @@ import 'package:attendance_management_system_vtys/features/attendance/providers/
 import 'package:attendance_management_system_vtys/features/attendance/screens/camera_screen.dart';
 import 'package:attendance_management_system_vtys/features/classroom/screens/documents_screen.dart';
 
+import '../../../../core/widgets/skeleton_detail_widget.dart';
+
 class StudentClassDetailScreen extends ConsumerWidget {
   final String className;
   final String classId;
@@ -163,7 +165,7 @@ class StudentClassDetailScreen extends ConsumerWidget {
                   error: (e, s) => Center(child: Text('Hata: $e')),
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const SkeletonDetailWidget(),
               error: (e, s) => Center(child: Text('Hata: $e')),
             ),
             const SizedBox(height: 24),

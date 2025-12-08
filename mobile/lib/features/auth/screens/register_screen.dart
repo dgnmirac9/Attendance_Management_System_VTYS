@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_controller.dart';
 import 'face_capture_screen.dart';
@@ -71,7 +72,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         );
         
         if (mounted) {
-          SnackbarUtils.showSuccess(context, 'Kayıt Başarılı! Giriş yapılıyor...');
+          SnackbarUtils.showSuccess(context, 'Kayıt Başarılı! Lütfen giriş yapınız.');
           Navigator.pop(context); // Go back to login or let AuthWrapper handle it
         }
       } catch (e) {
@@ -234,11 +235,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         TextFormField(
                           controller: _studentNoController,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(9),
+                          ],
+                          maxLength: 9,
                           decoration: const InputDecoration(
                             labelText: 'Öğrenci Numarası',
                             prefixIcon: Icon(Icons.badge),
+                            counterText: "",
                           ),
-                          validator: (val) => validateRequired(val, fieldName: 'Öğrenci No'),
+                          validator: (val) {
+                             if (val == null || val.isEmpty) return 'Zorunlu';
+                             if (val.length != 9) return '9 haneli olmalı';
+                             return null;
+                          },
                         ),
                         
                         const SizedBox(height: 16),

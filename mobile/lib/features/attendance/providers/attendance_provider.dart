@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../services/attendance_service.dart';
 import '../../auth/providers/auth_controller.dart';
+import '../../../core/constants/firestore_constants.dart';
 
 final attendanceServiceProvider = Provider<AttendanceService>((ref) {
   return AttendanceService();
@@ -102,11 +103,11 @@ class AttendanceController extends AsyncNotifier<void> {
 
       // 2. Save Record
       await FirebaseFirestore.instance
-          .collection('classes')
+          .collection(FirestoreConstants.classesCollection)
           .doc(classId)
-          .collection('sessions')
+          .collection(FirestoreConstants.sessionsCollection)
           .doc(sessionId)
-          .collection('records')
+          .collection(FirestoreConstants.recordsCollection)
           .doc(user.uid)
           .set({
         'studentId': user.uid,
