@@ -258,6 +258,18 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
+# Startup event - Create tables if they don't exist
+@app.on_event("startup")
+async def startup_event():
+    """Create database tables on startup"""
+    from app.database import engine, Base
+    from app.models import user, course, attendance, assignment, content, token
+    
+    print("🔧 Creating database tables...")
+    Base.metadata.create_all(bind=engine)
+    print("✅ Database tables created/verified")
+
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
@@ -395,16 +407,38 @@ app.openapi = custom_openapi
 # Include API routers
 from app.api.v1 import auth, debug
 
+print(f"🔍 Importing routers...")
+print(f"  - Auth router: {len(auth.router.routes)} routes")
+print(f"  - Debug router: {len(debug.router.routes)} routes")
+
+# Try to import face router
+try:
+    from app.api.v1 import face
+    print(f"  - Face router: {len(face.router.routes)} routes")
+    FACE_ROUTER_AVAILABLE = True
+except Exception as e:
+    print(f"  ⚠️  Face router import failed: {e}")
+    face = None
+    FACE_ROUTER_AVAILABLE = False
+
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+
+if FACE_ROUTER_AVAILABLE and face:
+    app.include_router(face.router, prefix="/api/v1/face", tags=["Face Recognition"])
+    print(f"✅ Face router included!")
+else:
+    print(f"⚠️  Face router NOT included - face recognition features disabled")
+
+print(f"✅ Routers included successfully!")
+print(f"  - Total app routes: {len(app.routes)}")
 
 # Debug endpoints (development only)
 if settings.ENVIRONMENT == "development":
     app.include_router(debug.router, prefix="/api/v1/debug", tags=["Debug"])
 
 # Additional routers will be added in later tasks
-# from app.api.v1 import users, face, courses, attendances, assignments
+# from app.api.v1 import users, courses, attendances, assignments
 # app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
-# app.include_router(face.router, prefix="/api/v1/face", tags=["Face Recognition"])
 # app.include_router(courses.router, prefix="/api/v1/courses", tags=["Courses"])
 # app.include_router(attendances.router, prefix="/api/v1/attendances", tags=["Attendances"])
 # app.include_router(assignments.router, prefix="/api/v1/assignments", tags=["Assignments"])

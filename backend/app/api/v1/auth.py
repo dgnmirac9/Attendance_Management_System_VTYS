@@ -139,6 +139,16 @@ async def register(
                     "Student registration requires: student_number, department, class_level, enrollment_year",
                     status_code=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Check if student number already exists
+            existing_student = db.query(Student).filter(
+                Student.student_number == user_data.student_number
+            ).first()
+            if existing_student:
+                raise AppException(
+                    "Student number already registered",
+                    status_code=status.HTTP_409_CONFLICT
+                )
         
         # Hash password
         hashed_password = auth_service.hash_password(user_data.password)
