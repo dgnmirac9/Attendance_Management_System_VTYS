@@ -57,3 +57,39 @@ class ValidationError(AppException):
     
     def __init__(self, message: str = "Validation error"):
         super().__init__(message, status_code=422)
+
+
+# Attendance-specific exceptions
+class AttendanceNotFoundError(AppException):
+    """Attendance session not found"""
+    
+    def __init__(self, message: str = "Attendance session not found"):
+        super().__init__(message, status_code=404)
+
+
+class AttendanceSessionClosedError(AppException):
+    """Attendance session is closed"""
+    
+    def __init__(self, message: str = "Attendance session is closed"):
+        super().__init__(message, status_code=400)
+
+
+class StudentNotEnrolledError(AppException):
+    """Student is not enrolled in the course"""
+    
+    def __init__(self, message: str = "Student is not enrolled in this course"):
+        super().__init__(message, status_code=403)
+
+
+class DuplicateAttendanceError(AppException):
+    """Attendance already recorded"""
+    
+    def __init__(self, message: str = "Attendance already recorded"):
+        super().__init__(message, status_code=409)
+
+
+class FaceVerificationError(AppException):
+    """Face verification failed"""
+    
+    def __init__(self, message: str = "Face verification failed"):
+        super().__init__(message, status_code=400)

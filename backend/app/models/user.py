@@ -110,6 +110,8 @@ class Instructor(Base):
         nullable=False,
         index=True
     )
+    instructor_number = Column(String(20), unique=True, nullable=True, index=True)
+    department = Column(String(100), nullable=True)
     title = Column(String(50), nullable=True)
     office_info = Column(String(100), nullable=True)
     profile_image_url = Column(String(255), nullable=True)

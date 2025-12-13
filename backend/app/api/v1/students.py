@@ -202,9 +202,7 @@ def update_my_profile(
     - User must have student role
     
     **Returns:**
-    - List of enrolled courses
-    
-    **Note:** This endpoint will be fully implemented when Course service is ready.
+    - List of enrolled courses with details
     """,
     responses={
         200: {
@@ -212,8 +210,18 @@ def update_my_profile(
             "content": {
                 "application/json": {
                     "example": {
-                        "message": "Course service not yet implemented",
-                        "courses": []
+                        "courses": [
+                            {
+                                "course_id": 1,
+                                "course_name": "Introduction to Programming",
+                                "course_code": "CS101",
+                                "instructor_name": "Dr. Jane Smith",
+                                "semester": "Fall",
+                                "year": 2024,
+                                "credits": 3
+                            }
+                        ],
+                        "total": 1
                     }
                 }
             }
@@ -236,11 +244,44 @@ def get_my_courses(
             detail="Only students can access this endpoint"
         )
     
-    # TODO: Implement when course service is ready
-    return {
-        "message": "Course service not yet implemented",
-        "courses": []
-    }
+    # Get student profile
+    student = user_service.get_student_profile_sync(db, current_user.user_id)
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student profile not found"
+        )
+    
+    try:
+        from app.services.course_service import course_service
+        
+        # Get enrolled courses
+        courses = course_service.list_student_courses_sync(db, student.student_id)
+        
+        # Format response
+        course_list = []
+        for course in courses:
+            course_list.append({
+                "course_id": course.course_id,
+                "course_name": course.course_name,
+                "course_code": course.course_code,
+                "instructor_name": course.instructor.user.full_name if course.instructor else "Unknown",
+                "semester": course.semester,
+                "year": course.year,
+                "credits": course.credits,
+                "is_active": course.is_active
+            })
+        
+        return {
+            "courses": course_list,
+            "total": len(course_list)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get courses: {str(e)}"
+        )
 
 
 @router.get(

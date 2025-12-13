@@ -318,15 +318,20 @@ def custom_openapi():
         }
     }
     
-    # Add security to all protected endpoints (except auth endpoints)
+    # Add security to all protected endpoints (except auth endpoints and health/root)
     for path, path_item in openapi_schema["paths"].items():
-        # Skip authentication endpoints
-        if "/auth/" in path:
+        # Skip authentication endpoints, health check, and root
+        if "/auth/" in path or path in ["/health", "/", "/docs", "/redoc", "/openapi.json"]:
             continue
         
         # Add security requirement to all methods
-        for method in path_item.values():
-            if isinstance(method, dict) and "parameters" in method or "requestBody" in method:
+        for method_name, method in path_item.items():
+            # Skip non-method items (like parameters, servers, etc.)
+            if method_name not in ["get", "post", "put", "delete", "patch", "options", "head"]:
+                continue
+            
+            if isinstance(method, dict):
+                # Force add security to this endpoint
                 method["security"] = [{"BearerAuth": []}]
     
     # Add example responses
@@ -421,6 +426,56 @@ except Exception as e:
     face = None
     FACE_ROUTER_AVAILABLE = False
 
+# Try to import students router
+try:
+    from app.api.v1 import students
+    print(f"  - Students router: {len(students.router.routes)} routes")
+    STUDENTS_ROUTER_AVAILABLE = True
+except Exception as e:
+    print(f"  ⚠️  Students router import failed: {e}")
+    students = None
+    STUDENTS_ROUTER_AVAILABLE = False
+
+# Try to import instructors router
+try:
+    from app.api.v1 import instructors
+    print(f"  - Instructors router: {len(instructors.router.routes)} routes")
+    INSTRUCTORS_ROUTER_AVAILABLE = True
+except Exception as e:
+    print(f"  ⚠️  Instructors router import failed: {e}")
+    instructors = None
+    INSTRUCTORS_ROUTER_AVAILABLE = False
+
+# Try to import test_auth router
+try:
+    from app.api.v1 import test_auth
+    print(f"  - Test Auth router: {len(test_auth.router.routes)} routes")
+    TEST_AUTH_ROUTER_AVAILABLE = True
+except Exception as e:
+    print(f"  ⚠️  Test Auth router import failed: {e}")
+    test_auth = None
+    TEST_AUTH_ROUTER_AVAILABLE = False
+
+# Try to import courses router
+try:
+    from app.api.v1 import courses
+    print(f"  - Courses router: {len(courses.router.routes)} routes")
+    COURSES_ROUTER_AVAILABLE = True
+except Exception as e:
+    print(f"  ⚠️  Courses router import failed: {e}")
+    courses = None
+    COURSES_ROUTER_AVAILABLE = False
+
+# Try to import attendances router
+try:
+    from app.api.v1 import attendances
+    print(f"  - Attendances router: {len(attendances.router.routes)} routes")
+    ATTENDANCES_ROUTER_AVAILABLE = True
+except Exception as e:
+    print(f"  ⚠️  Attendances router import failed: {e}")
+    attendances = None
+    ATTENDANCES_ROUTER_AVAILABLE = False
+
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 
 if FACE_ROUTER_AVAILABLE and face:
@@ -428,6 +483,36 @@ if FACE_ROUTER_AVAILABLE and face:
     print(f"✅ Face router included!")
 else:
     print(f"⚠️  Face router NOT included - face recognition features disabled")
+
+if STUDENTS_ROUTER_AVAILABLE and students:
+    app.include_router(students.router, prefix="/api/v1/students", tags=["Students"])
+    print(f"✅ Students router included!")
+else:
+    print(f"⚠️  Students router NOT included")
+
+if INSTRUCTORS_ROUTER_AVAILABLE and instructors:
+    app.include_router(instructors.router, prefix="/api/v1/instructors", tags=["Instructors"])
+    print(f"✅ Instructors router included!")
+else:
+    print(f"⚠️  Instructors router NOT included")
+
+if TEST_AUTH_ROUTER_AVAILABLE and test_auth:
+    app.include_router(test_auth.router, prefix="/api/v1/test", tags=["🧪 Test Authentication"])
+    print(f"✅ Test Auth router included!")
+else:
+    print(f"⚠️  Test Auth router NOT included")
+
+if COURSES_ROUTER_AVAILABLE and courses:
+    app.include_router(courses.router, prefix="/api/v1/courses", tags=["Courses"])
+    print(f"✅ Courses router included!")
+else:
+    print(f"⚠️  Courses router NOT included")
+
+if ATTENDANCES_ROUTER_AVAILABLE and attendances:
+    app.include_router(attendances.router, prefix="/api/v1/attendances", tags=["Attendances"])
+    print(f"✅ Attendances router included!")
+else:
+    print(f"⚠️  Attendances router NOT included")
 
 print(f"✅ Routers included successfully!")
 print(f"  - Total app routes: {len(app.routes)}")

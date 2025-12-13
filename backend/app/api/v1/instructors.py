@@ -20,8 +20,8 @@ class InstructorProfileResponse(BaseModel):
     """Instructor profile response"""
     instructor_id: int
     user_id: int
-    instructor_number: str
-    department: str
+    instructor_number: str | None
+    department: str | None
     title: str | None
     full_name: str
     email: str
@@ -102,8 +102,8 @@ def get_my_profile(
     return {
         "instructor_id": instructor.instructor_id,
         "user_id": instructor.user_id,
-        "instructor_number": instructor.instructor_number,
-        "department": instructor.department,
+        "instructor_number": getattr(instructor, 'instructor_number', None),
+        "department": getattr(instructor, 'department', None),
         "title": instructor.title,
         "full_name": current_user.full_name,
         "email": current_user.email
@@ -176,8 +176,8 @@ def update_my_profile(
         return {
             "instructor_id": instructor.instructor_id,
             "user_id": instructor.user_id,
-            "instructor_number": instructor.instructor_number,
-            "department": instructor.department,
+            "instructor_number": getattr(instructor, 'instructor_number', None),
+            "department": getattr(instructor, 'department', None),
             "title": instructor.title,
             "full_name": updated_user.full_name,
             "email": updated_user.email
@@ -203,9 +203,7 @@ def update_my_profile(
     - User must have instructor role
     
     **Returns:**
-    - List of courses
-    
-    **Note:** This endpoint will be fully implemented when Course service is ready.
+    - List of courses with enrollment statistics
     """,
     responses={
         200: {
@@ -213,8 +211,21 @@ def update_my_profile(
             "content": {
                 "application/json": {
                     "example": {
-                        "message": "Course service not yet implemented",
-                        "courses": []
+                        "courses": [
+                            {
+                                "course_id": 1,
+                                "course_name": "Introduction to Programming",
+                                "course_code": "CS101",
+                                "join_code": "ABC123",
+                                "semester": "Fall",
+                                "year": 2024,
+                                "credits": 3,
+                                "max_students": 50,
+                                "enrolled_students": 25,
+                                "is_active": True
+                            }
+                        ],
+                        "total": 1
                     }
                 }
             }
@@ -237,8 +248,47 @@ def get_my_courses(
             detail="Only instructors can access this endpoint"
         )
     
-    # TODO: Implement when course service is ready
-    return {
-        "message": "Course service not yet implemented",
-        "courses": []
-    }
+    # Get instructor profile
+    instructor = user_service.get_instructor_profile_sync(db, current_user.user_id)
+    if not instructor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Instructor profile not found"
+        )
+    
+    try:
+        from app.services.course_service import course_service
+        
+        # Get instructor's courses
+        courses = course_service.list_instructor_courses_sync(db, instructor.instructor_id)
+        
+        # Format response with enrollment stats
+        course_list = []
+        for course in courses:
+            enrolled_count = course_service._get_enrollment_count_sync(db, course.course_id)
+            
+            course_list.append({
+                "course_id": course.course_id,
+                "course_name": course.course_name,
+                "course_code": course.course_code,
+                "join_code": course.join_code,
+                "description": course.description,
+                "semester": course.semester,
+                "year": course.year,
+                "credits": course.credits,
+                "max_students": course.max_students,
+                "enrolled_students": enrolled_count,
+                "is_active": course.is_active,
+                "created_at": course.created_at.isoformat()
+            })
+        
+        return {
+            "courses": course_list,
+            "total": len(course_list)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get courses: {str(e)}"
+        )

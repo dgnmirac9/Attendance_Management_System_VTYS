@@ -2,7 +2,7 @@
 
 import secrets
 import string
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, UniqueConstraint, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -27,9 +27,15 @@ class Course(Base):
     )
     course_name = Column(String(100), nullable=False)
     course_code = Column(String(20), unique=True, nullable=False)
+    description = Column(Text, nullable=True)
     semester = Column(String(20), nullable=False)
+    year = Column(Integer, nullable=False)
+    credits = Column(Integer, nullable=True)
+    max_students = Column(Integer, nullable=True)
     join_code = Column(String(10), unique=True, nullable=False, index=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
     
     # Relationships
     instructor = relationship("Instructor", back_populates="courses")
@@ -90,7 +96,9 @@ class CourseEnrollment(Base):
         nullable=False,
         index=True
     )
+    enrollment_status = Column(String(20), default="active", nullable=False)
     joined_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now())
     
     # Relationships
     student = relationship("Student", back_populates="enrollments")

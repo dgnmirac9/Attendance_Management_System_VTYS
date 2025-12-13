@@ -14,20 +14,33 @@ class CourseBase(BaseModel):
 
 class CourseCreate(CourseBase):
     """Schema for creating a course"""
-    pass
+    description: Optional[str] = Field(None, max_length=1000)
+    year: Optional[int] = Field(None, ge=1900, le=2100)
+    credits: Optional[int] = Field(None, ge=1, le=10)
+    max_students: Optional[int] = Field(None, ge=1, le=1000)
 
 
 class CourseUpdate(BaseModel):
     """Schema for updating a course"""
     course_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=1000)
     semester: Optional[str] = Field(None, min_length=1, max_length=20)
+    year: Optional[int] = Field(None, ge=1900, le=2100)
+    credits: Optional[int] = Field(None, ge=1, le=10)
+    max_students: Optional[int] = Field(None, ge=1, le=1000)
+    is_active: Optional[bool] = None
 
 
 class CourseResponse(CourseBase):
     """Schema for course response"""
     course_id: int
     instructor_id: int
-    join_code: str
+    description: Optional[str] = None
+    year: Optional[int] = None
+    credits: Optional[int] = None
+    max_students: Optional[int] = None
+    join_code: Optional[str] = None  # Hidden for students
+    is_active: bool
     created_at: datetime
     
     class Config:
@@ -38,6 +51,11 @@ class CourseDetailResponse(CourseResponse):
     """Schema for detailed course response with instructor info"""
     instructor: 'InstructorBasicInfo'
     enrolled_students_count: int
+
+
+class CourseEnrollRequest(BaseModel):
+    """Schema for course enrollment request"""
+    join_code: str = Field(..., min_length=1, max_length=10)
 
 
 class InstructorBasicInfo(BaseModel):

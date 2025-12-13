@@ -23,8 +23,12 @@ class Attendance(Base):
         nullable=False,
         index=True
     )
-    attendance_date = Column(DateTime, server_default=func.now())
+    session_name = Column(String(100), nullable=False)
+    description = Column(String(500), nullable=True)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
     
     # Relationships
     course = relationship("Course", back_populates="attendances")
@@ -56,10 +60,10 @@ class AttendanceRecord(Base):
         nullable=False,
         index=True
     )
-    recognized = Column(Boolean, default=False)
-    accuracy_percentage = Column(Numeric(5, 2), nullable=True)
-    location_info = Column(String(255), nullable=True)
-    joined_at = Column(DateTime, server_default=func.now())
+    check_in_time = Column(DateTime, nullable=False)
+    face_similarity_score = Column(Numeric(5, 4), nullable=True)
+    is_verified = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
     
     # Relationships
     attendance = relationship("Attendance", back_populates="records")
