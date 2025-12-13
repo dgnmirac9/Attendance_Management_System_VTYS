@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class ClassModel {
   final String id;
   final String className;
@@ -19,26 +17,27 @@ class ClassModel {
     this.createdAt,
   });
 
-  factory ClassModel.fromMap(Map<String, dynamic> data, String id) {
+  factory ClassModel.fromJson(Map<String, dynamic> json) {
     return ClassModel(
-      id: id,
-      className: data['className'] ?? '',
-      teacherId: data['teacherId'] ?? '',
-      teacherName: data['teacherName'] ?? '',
-      joinCode: data['joinCode'] ?? '',
-      studentIds: List<String>.from(data['studentIds'] ?? []),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      id: json['id']?.toString() ?? '',
+      className: json['class_name'] ?? '',
+      teacherId: json['teacher_id']?.toString() ?? '',
+      teacherName: json['teacher_name'] ?? '',
+      joinCode: json['join_code'] ?? '',
+      studentIds: (json['student_ids'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
-      'className': className,
-      'teacherId': teacherId,
-      'teacherName': teacherName,
-      'joinCode': joinCode,
-      'studentIds': studentIds,
-      // 'createdAt': FieldValue.serverTimestamp(),
+      'id': id,
+      'class_name': className,
+      'teacher_id': teacherId,
+      'teacher_name': teacherName,
+      'join_code': joinCode,
+      'student_ids': studentIds,
+      // 'created_at': createdAt?.toIso8601String(),
     };
   }
 }

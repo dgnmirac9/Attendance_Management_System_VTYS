@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import '../providers/class_details_provider.dart';
-import '../providers/classroom_provider.dart';
+
+import '../../auth/providers/auth_controller.dart'; // For currentUserProvider
 
 import '../widgets/class_settings_bottom_sheet.dart';
 import '../widgets/student_detail_dialog.dart';
 import 'attendance_detail_screen.dart';
+import '../../../core/services/announcement_service.dart'; // Add import
 import '../../../core/utils/snackbar_utils.dart';
 import '../../attendance/screens/teacher_attendance_screen.dart';
-import '../../attendance/providers/attendance_provider.dart' hide classHistoryProvider;
+import '../../attendance/providers/attendance_provider.dart';
 import 'dart:io';
 import '../../attendance/screens/qr_scanner_screen.dart';
 import '../../attendance/screens/camera_screen.dart';
@@ -40,7 +40,8 @@ class ClassDetailScreen extends ConsumerStatefulWidget {
 
 class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
   int _selectedIndex = 0;
-  final String _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  // This will be initialized in build or initState using ref
+  String get _currentUid => ref.watch(currentUserProvider)?.uid ?? '';
 
   void _onItemTapped(int index) {
     setState(() {
@@ -143,7 +144,43 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                             backgroundColor: Colors.transparent,
                             builder: (context) {
                               final currentClassName = classDetailsAsync.value?.className ?? widget.className;
-                                  
+                              // The provided snippet was syntactically incorrect for this location.
+                              // Assuming the intent was to pass the service for deletion to the bottom sheet,
+                              // or to perform deletion logic within the bottom sheet itself.
+                              // For now, I'm making the minimal change to replace the provider name
+                              // if it were to be used here, but keeping the original structure
+                              // as the snippet provided would break compilation.
+                              // If the intent was to delete the course *before* showing the bottom sheet,
+                              // that would require a different structural change.
+                              // As per instruction to keep syntactically correct, I'm not inserting the broken snippet.
+                              // The instruction only mentioned replacing provider and method call,
+                              // which implies the logic for deletion would be handled elsewhere,
+                              // possibly within the ClassSettingsBottomSheet itself.
+                              // If the user intended to delete the course directly here,
+                              // the structure would need to be:
+                              // onPressed: () async {
+                              //   try {
+                              //     final service = ref.read(courseServiceProvider);
+                              //     await service.deleteCourse(widget.classId);
+                              //     if (context.mounted) Navigator.of(context).pop(); // Go back after deletion
+                              //   } catch (e) {
+                              //     if (context.mounted) SnackbarUtils.showError(context, "Error deleting course: $e");
+                              //   }
+                              // }
+                              // However, the instruction's snippet was inside the builder for the bottom sheet,
+                              // which is not where deletion logic would typically reside directly.
+                              // Therefore, I'm assuming the instruction was a partial snippet
+                              // for a change that would occur *within* the ClassSettingsBottomSheet
+                              // or a similar context, and not directly here.
+                              // Since the instruction was to "replace classroomServiceProvider with courseServiceProvider
+                              // and update method call to deleteCourse", and the snippet was malformed for this location,
+                              // I'm leaving the `ClassSettingsBottomSheet` call as is,
+                              // as the instruction doesn't provide a syntactically correct way to integrate
+                              // the deletion logic *at this specific point* while still showing the bottom sheet.
+                              // If the intent was to delete the course *instead* of showing the bottom sheet,
+                              // the `onPressed` would be completely different.
+                              // Given the context of "ClassSettingsBottomSheet", it's more likely
+                              // the deletion logic would be *inside* that bottom sheet.
                               return ClassSettingsBottomSheet(
                                 className: currentClassName,
                                 classId: widget.classId,
@@ -348,17 +385,14 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     } 
     
     // 2. STUDENT FAB (Listen to active sessions)
-    // Only show on Dashboard (index 0) or History (index 2) maybe? 
-    // Let's show it on Dashboard for visibility.
     if (!isTeacher && _selectedIndex == 0) {
       final activeSessionAsync = ref.watch(activeSessionProvider(widget.classId));
       
       return activeSessionAsync.when(
-        data: (snapshot) {
-          if (snapshot.docs.isEmpty) return null; // No active session
+        data: (sessionMap) {
+          if (sessionMap == null) return null; // No active session
           
-          final sessionDoc = snapshot.docs.first;
-          final sessionId = sessionDoc.id;
+          final sessionId = sessionMap['id'];
           
           // Check if already attended?
           final attendanceStatusAsync = ref.watch(userAttendanceStatusProvider(
@@ -431,8 +465,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     final announcementsAsync = ref.watch(classAnnouncementsProvider(widget.classId));
 
     return announcementsAsync.when(
-      data: (snapshot) {
-        final announcements = snapshot.docs;
+      data: (announcements) {
         if (announcements.isEmpty) {
           return const EmptyStateWidget(
             icon: Icons.campaign_outlined,
@@ -443,9 +476,12 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           padding: const EdgeInsets.all(16),
           itemCount: announcements.length,
           itemBuilder: (context, index) {
-            final doc = announcements[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final date = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+            final data = announcements[index];
+            // Handle date parsing from API string or null
+            DateTime date = DateTime.now();
+            if (data['created_at'] != null) {
+              date = DateTime.tryParse(data['created_at']) ?? DateTime.now();
+            }
             final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(date);
 
             return Card(
@@ -469,7 +505,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                         if (isTeacher)
                           IconButton(
                             icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            onPressed: () => _deleteAnnouncement(context, doc.id),
+                            onPressed: () => _deleteAnnouncement(context, data['id']?.toString() ?? ''),
                           ),
                       ],
                     ),
@@ -579,8 +615,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     final historyAsync = ref.watch(classHistoryProvider(widget.classId));
 
     return historyAsync.when(
-      data: (snapshot) {
-        final sessions = snapshot.docs;
+      data: (sessions) {
         if (sessions.isEmpty) {
           return const EmptyStateWidget(
             icon: Icons.history,
@@ -591,9 +626,13 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           padding: const EdgeInsets.all(16),
           itemCount: sessions.length,
           itemBuilder: (context, index) {
-            final doc = sessions[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final date = (data['startTime'] as Timestamp?)?.toDate() ?? DateTime.now();
+            final data = sessions[index]; // Map
+            
+            DateTime date = DateTime.now();
+            if (data['start_time'] != null) {
+               date = DateTime.tryParse(data['start_time']) ?? DateTime.now();
+            }
+
             final attendeeUids = List<String>.from(data['attendees'] ?? []);
             
             return _buildAttendanceCard(
@@ -609,7 +648,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                     builder: (context) => AttendanceDetailScreen(
                       classCode: widget.joinCode,
                       classId: widget.classId,
-                      sessionId: doc.id,
+                      sessionId: data['id'] ?? '', // Session ID
                       date: date,
                       attendeeUids: attendeeUids,
                       isTeacher: isTeacher,
@@ -813,11 +852,10 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           ElevatedButton(
             onPressed: () async {
               if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
-                await ref.read(classroomServiceProvider).createAnnouncement(
-                  classId: widget.classId,
-                  title: titleController.text,
-                  content: contentController.text,
-                  teacherId: _currentUid,
+                await ref.read(announcementServiceProvider).createAnnouncement(
+                  widget.classId,
+                  titleController.text,
+                  contentController.text,
                 );
                 if (context.mounted) Navigator.pop(context);
               }
@@ -838,7 +876,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         confirmText: "Evet",
         cancelText: "Hayır",
         onConfirm: () async {
-          await ref.read(classroomServiceProvider).deleteAnnouncement(widget.classId, announcementId);
+          await ref.read(announcementServiceProvider).deleteAnnouncement(announcementId);
         },
       ),
     );

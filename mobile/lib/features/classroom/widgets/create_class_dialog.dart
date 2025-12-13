@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/utils/snackbar_utils.dart';
 
 import '../providers/classroom_provider.dart';
-import '../../auth/services/user_service.dart';
+import '../../auth/providers/auth_controller.dart';
 
 class CreateClassDialog extends ConsumerStatefulWidget {
   const CreateClassDialog({super.key});
@@ -30,30 +29,21 @@ class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = ref.read(currentUserProvider);
       if (user == null) throw Exception("Kullanıcı oturumu bulunamadı");
 
-      // Fetch teacher's name from Firestore profile
-      String teacherName = "Öğretim Görevlisi";
-      try {
-        final userDoc = await ref.read(userServiceProvider).getUserStream(user.uid).first;
-        if (userDoc.exists) {
-          final data = userDoc.data() as Map<String, dynamic>;
-          if (data.containsKey('name') && data['name'].toString().isNotEmpty) {
-             teacherName = data['name'];
-          } else if (data.containsKey('firstName') || data.containsKey('lastName')) {
-             teacherName = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
-          }
+      // Fetch teacher's name from current user state
+      String teacherName = user.name;
+      if (teacherName.isEmpty) {
+        if (user.firstName != null && user.firstName!.isNotEmpty) {
+           teacherName = "${user.firstName} ${user.lastName ?? ''}".trim();
+        } else {
+           teacherName = user.email; // Fallback
         }
-      } catch (e) {
-        debugPrint("Error fetching teacher name: $e");
       }
-      
-      if (teacherName.isEmpty) teacherName = user.displayName ?? user.email ?? "Öğretim Görevlisi";
 
-      await ref.read(classroomServiceProvider).createClass(
+      await ref.read(classroomControllerProvider.notifier).createClass(
         className: _classNameController.text.trim(),
-        teacherId: user.uid,
         teacherName: teacherName,
       );
 

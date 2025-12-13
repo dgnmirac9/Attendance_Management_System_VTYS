@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/utils/snackbar_utils.dart'; // Assuming this exists or using ScaffoldMessenger directly if not
+import '../../../core/services/attendance_service.dart';
 import '../providers/attendance_provider.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/custom_confirm_dialog.dart';
@@ -37,6 +38,8 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
     _updateQrCode();
     _qrTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       _updateQrCode();
+      // Poll attendance list
+      ref.invalidate(sessionAttendanceProvider(widget.sessionId));
     });
   }
 
@@ -57,11 +60,10 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
       });
     }
 
-    // Servis üzerinden Firestore'u güncelle
+    // Servis üzerinden API'yi güncelle
     ref.read(attendanceServiceProvider).updateSessionQrCode(
-      classId: widget.classId, 
-      sessionId: widget.sessionId, 
-      qrCode: newCode
+      widget.sessionId, 
+      newCode
     );
   }
 
@@ -103,7 +105,7 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
     
     // Canlı katılımcıları izle
     final sessionAttendanceAsync = ref.watch(
-      sessionAttendanceProvider((classId: widget.classId, sessionId: widget.sessionId)),
+      sessionAttendanceProvider(widget.sessionId),
     );
 
     return Scaffold(
@@ -167,8 +169,7 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
           
           // KATILIMCI LİSTESİ PANELİ
           sessionAttendanceAsync.when(
-            data: (snapshot) {
-              final records = snapshot.docs;
+            data: (records) {
               return Expanded(
                 child: Column(
                   children: [
@@ -211,7 +212,7 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               itemCount: records.length,
                               itemBuilder: (context, index) {
-                                final record = records[index].data() as Map<String, dynamic>;
+                                final record = records[index];
                                 final name = record['name'] ?? record['studentId'] ?? "Öğrenci";
                                 final studentId = record['studentId'] ?? "";
                                 

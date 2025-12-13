@@ -1,12 +1,15 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/constants/firestore_constants.dart';
+import '../../auth/models/user_model.dart';
+import 'package:flutter/foundation.dart';
+import '../../../core/network/api_client.dart';
+import 'package:dio/dio.dart';
 
 final userServiceProvider = Provider((ref) => UserService());
 
 class UserService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ApiClient _apiClient;
+
+  UserService() : _apiClient = ApiClient();
 
   Future<void> saveUserData({
     required String uid,
@@ -17,65 +20,57 @@ class UserService {
     String role = 'student',
   }) async {
     try {
-      final Map<String, dynamic> userData = {
+      await _apiClient.dio.put('/users/me', data: {
         'name': name,
-        'firstName': firstName ?? name.split(' ').first,
-        'lastName': lastName ?? (name.split(' ').length > 1 ? name.split(' ').sublist(1).join(' ') : ''),
-        'email': email,
-        'role': role,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
-
-      await _firestore.collection(FirestoreConstants.usersCollection).doc(uid).set(userData, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('Error saving user data: $e');
-      rethrow;
+        'first_name': firstName,
+        'last_name': lastName,
+        'email': email, // Email usually not updatable here, but passing if API expects
+        // 'role': role, // Role usually not updatable by user
+      });
+    } on DioException catch (e) {
+      throw e.response?.data['message'] ?? 'Profil güncellenemedi.';
     }
   }
 
   Future<void> updateStudentId(String uid, String studentId) async {
     try {
-      await _firestore.collection(FirestoreConstants.usersCollection).doc(uid).update({
-        'studentId': studentId,
+      await _apiClient.dio.put('/users/me/student-id', data: {
+        'student_id': studentId,
       });
-    } catch (e) {
-      debugPrint('Error updating student ID: $e');
-      // If doc doesn't exist, set it
-       await _firestore.collection(FirestoreConstants.usersCollection).doc(uid).set({
-        'studentId': studentId,
-      }, SetOptions(merge: true));
+    } on DioException catch (e) {
+      throw e.response?.data['message'] ?? 'Öğrenci numarası güncellenemedi.';
     }
   }
+
   Future<String?> getUserRole(String uid) async {
+    // Should be cached in AuthController, but if needed via API:
     try {
-      final doc = await _firestore.collection(FirestoreConstants.usersCollection).doc(uid).get();
-      if (doc.exists) {
-        return doc.data()?['role'] as String?;
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error getting user role: $e');
+      final response = await _apiClient.dio.get('/users/$uid/role'); // Or /auth/me
+      return response.data['role'];
+    } catch (_) {
       return null;
     }
   }
 
-  // Update the custom order of classes for the user
   Future<void> updateClassOrder(String uid, List<String> newOrder) async {
     try {
-      await _firestore.collection(FirestoreConstants.usersCollection).doc(uid).update({
-        'classOrder': newOrder,
+      await _apiClient.dio.put('/users/me/class-order', data: {
+        'class_order': newOrder,
       });
-    } catch (e) {
-      debugPrint('Error updating class order: $e');
-      // If the field doesn't exist, set it (using set with merge)
-      await _firestore.collection(FirestoreConstants.usersCollection).doc(uid).set({
-        'classOrder': newOrder,
-      }, SetOptions(merge: true));
+    } on DioException catch (e) {
+      // Fail silently or log
+      debugPrint('Error getting user data: $e');
     }
   }
 
-  // Stream of user data (to listen for classOrder changes)
-  Stream<DocumentSnapshot> getUserStream(String uid) {
-    return _firestore.collection(FirestoreConstants.usersCollection).doc(uid).snapshots();
+  Future<UserModel> getUser(String uid) async {
+     try {
+       // Assuming /users/me or /users/:id. For 'me', we might ignore uid if it matches current.
+       // For safety, let's use /auth/me endpoint if uid matches, or /users/:id if we have permission
+       final response = await _apiClient.dio.get('/auth/me'); 
+       return UserModel.fromJson(response.data);
+     } on DioException catch (e) {
+       throw e.response?.data['message'] ?? 'Kullanıcı bilgisi alınamadı.';
+     }
   }
 }

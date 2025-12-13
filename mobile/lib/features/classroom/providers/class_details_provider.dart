@@ -1,35 +1,34 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../attendance/services/attendance_service.dart';
-import 'classroom_provider.dart';
+import '../../../core/services/course_service.dart';
+import '../../../core/services/attendance_service.dart';
+import '../../../core/services/announcement_service.dart';
 import '../models/class_model.dart';
 import '../../auth/models/user_model.dart';
 
-final attendanceServiceProvider = Provider((ref) => AttendanceService());
-
-// 1. Class Metadata Stream
-final classDetailsProvider = StreamProvider.family<ClassModel?, String>((ref, classId) {
-  final service = ref.watch(classroomServiceProvider);
-  return service.getClassStream(classId);
+// 1. Class Metadata Future
+final classDetailsProvider = FutureProvider.family<ClassModel, String>((ref, classId) async {
+  final service = ref.watch(courseServiceProvider);
+  return service.getCourseDetails(classId);
 });
 
-// 2. Announcements Stream
-final classAnnouncementsProvider = StreamProvider.family<QuerySnapshot, String>((ref, classId) {
-  final service = ref.watch(classroomServiceProvider);
+// 2. Announcements Future
+final classAnnouncementsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, classId) async {
+  final service = ref.watch(announcementServiceProvider);
   return service.getAnnouncements(classId);
 });
 
 // 3. Students Future (List of User Data)
+// Assuming CourseService has getStudents or similar. If not, we need to add it or use /courses/:id/students
 final classStudentsProvider = FutureProvider.family<List<UserModel>, String>((ref, classId) async {
-  final service = ref.watch(classroomServiceProvider);
+  final service = ref.watch(courseServiceProvider);
   // We want to refresh this when class details change (e.g. new student joins)
   ref.watch(classDetailsProvider(classId)); 
-  return service.getClassStudents(classId);
+  return service.getCourseStudents(classId);
 });
 
-// 4. History Stream (Sessions)
-final classHistoryProvider = StreamProvider.family<QuerySnapshot, String>((ref, classId) {
+// 4. History Future (Sessions)
+final classHistoryProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, classId) async {
   final service = ref.watch(attendanceServiceProvider);
-  return service.getClassHistory(classId);
+  return service.getAttendanceHistory(classId);
 });

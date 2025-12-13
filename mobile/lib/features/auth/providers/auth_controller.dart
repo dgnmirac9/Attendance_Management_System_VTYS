@@ -1,41 +1,39 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/user_model.dart';
+import '../../../core/services/auth_service.dart';
 
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/user_service.dart';
-import '../../../core/constants/firestore_constants.dart';
+// State: Contains the current authenticated user (or null) and loading/error state
+class AuthController extends StateNotifier<AsyncValue<UserModel?>> {
+  final AuthService _authService;
 
-class AuthController extends StateNotifier<AsyncValue<void>> {
-  final UserService _userService;
-  final Ref _ref;
+  AuthController(this._authService) : super(const AsyncValue.loading()) {
+    _checkAuthStatus();
+  }
 
-  AuthController(this._userService, this._ref) : super(const AsyncValue.data(null));
+  Future<void> _checkAuthStatus() async {
+    try {
+      final token = await _authService.getToken();
+      if (token != null) {
+        final user = await _authService.getUserProfile();
+        state = AsyncValue.data(user);
+      } else {
+        state = const AsyncValue.data(null);
+      }
+    } catch (e) {
+      // If error (e.g. token expired), logout
+      await _authService.logout();
+      state = const AsyncValue.data(null);
+    }
+  }
 
   Future<void> signIn({required String email, required String password}) async {
     state = const AsyncValue.loading();
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      state = const AsyncValue.data(null);
-    } on FirebaseAuthException catch (e) {
-      String message = "Giriş başarısız.";
-      if (e.code == 'user-not-found') {
-        message = "Kullanıcı bulunamadı.";
-      } else if (e.code == 'wrong-password') {
-        message = "Hatalı şifre.";
-      } else if (e.code == 'invalid-email') {
-        message = "Geçersiz e-posta formatı.";
-      } else if (e.code == 'invalid-credential') {
-        message = "Hatalı e-posta veya şifre.";
-      }
-      state = AsyncValue.error(message, StackTrace.current);
-      throw message;
+      final user = await _authService.login(email, password);
+      state = AsyncValue.data(user);
     } catch (e) {
       state = AsyncValue.error(e, StackTrace.current);
-      throw "Beklenmedik bir hata oluştu: $e";
+      rethrow;
     }
   }
 
@@ -46,87 +44,21 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     required String firstName,
     required String lastName,
     String? studentNo,
-    // List<List<double>>? faceEmbeddings, // Future use
+    String? faceImagePath,
   }) async {
     state = const AsyncValue.loading();
     try {
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      await _authService.register(
         email: email,
         password: password,
+        role: role,
+        firstName: firstName,
+        lastName: lastName,
+        studentNo: studentNo,
+        faceImagePath: faceImagePath,
       );
-      
-      // Save additional user data to Firestore
-      // IMPORTANT: Make sure Firestore rules are set to public (test mode) for now.
-        await _userService.saveUserData(
-          uid: userCredential.user!.uid,
-          name: '$firstName $lastName',
-          firstName: firstName,
-          lastName: lastName,
-          // studentId: studentNo ?? '', // Removed from signature in UserService update above, handled below logic? 
-          // Wait, I removed studentId from signature in UserService but logic below uses it.
-          // I need to check UserService again. 
-          // Ah, I replaced the block, checking UserService content again.
-          email: email,
-          role: role,
-        );
-        
-        // Re-adding studentId handling if UserService still expects it logic-wise but I missed it in replacement.
-        // Let's check UserService again to be safe. 
-        // Actually, let's just make sure I pass what's needed.
-        if (role == 'student' && studentNo != null) {
-           await _userService.updateStudentId(userCredential.user!.uid, studentNo);
-        }
-
-        // Prevent auto-login: Sign out immediately
-        await FirebaseAuth.instance.signOut();
-
-      state = const AsyncValue.data(null);
-    } on FirebaseAuthException catch (e) {
-      String message = "Kayıt başarısız.";
-      if (e.code == 'email-already-in-use') {
-        message = "Bu e-posta adresi zaten kullanımda.";
-      } else if (e.code == 'weak-password') {
-        message = "Şifre çok zayıf.";
-      } else if (e.code == 'invalid-email') {
-        message = "Geçersiz e-posta adresi.";
-      }
-      state = AsyncValue.error(message, StackTrace.current);
-      throw message;
-    } catch (e) {
-      state = AsyncValue.error(e, StackTrace.current);
-      throw "Kayıt sırasında bir hata oluştu: $e";
-    }
-  }
-  
-  Future<void> updatePassword({
-    required String oldPassword,
-    required String newPassword,
-  }) async {
-    state = const AsyncValue.loading();
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception("Kullanıcı oturum açmamış.");
-      if (user.email == null) throw Exception("Kullanıcı e-postası bulunamadı.");
-
-      AuthCredential credential = EmailAuthProvider.credential(
-        email: user.email!, 
-        password: oldPassword,
-      );
-      
-      await user.reauthenticateWithCredential(credential);
-      await user.updatePassword(newPassword);
-
-      state = const AsyncValue.data(null);
-    } on FirebaseAuthException catch (e) {
-      String message = "Hata oluştu: ${e.message}";
-      if (e.code == 'wrong-password' || e.code == 'user-not-found' || e.code == 'invalid-credential') {
-        message = "Mevcut şifreniz yanlış.";
-      } else if (e.code == 'requires-recent-login') {
-        message = "Güvenlik nedeniyle tekrar giriş yapıp deneyin.";
-      }
-      // Put a clean message in the error so UI can show it
-      state = AsyncValue.error(message, StackTrace.current); 
-      throw message; 
+      // Auto login after register
+      await signIn(email: email, password: password);
     } catch (e) {
       state = AsyncValue.error(e, StackTrace.current);
       rethrow;
@@ -136,37 +68,44 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   Future<void> signOut() async {
     state = const AsyncValue.loading();
     try {
-      await FirebaseAuth.instance.signOut();
-      _ref.invalidate(userRoleProvider);
+      await _authService.logout();
       state = const AsyncValue.data(null);
     } catch (e) {
       state = AsyncValue.error(e, StackTrace.current);
-      debugPrint('SignOut error: $e');
+    }
+  }
+
+  Future<void> updatePassword({required String oldPassword, required String newPassword}) async {
+    // state = const AsyncValue.loading(); // Optional: don't block whole UI, just dialog
+    try {
+      await _authService.updatePassword(oldPassword, newPassword);
+      // state remains same (user is still logged in)
+    } catch (e) {
+      // Don't change global state to error, just rethrow to dialog
+      rethrow;
     }
   }
 }
 
-final authControllerProvider = StateNotifierProvider<AuthController, AsyncValue<void>>((ref) {
-  return AuthController(UserService(), ref);
+final authServiceProvider = Provider<AuthService>((ref) {
+  return AuthService();
 });
 
-final userRoleProvider = FutureProvider.autoDispose<String?>((ref) async {
-  final authState = ref.watch(authStateChangesProvider);
-  return authState.value?.uid != null
-      ? await UserService().getUserRole(authState.value!.uid)
-      : null;
+final authControllerProvider = StateNotifierProvider<AuthController, AsyncValue<UserModel?>>((ref) {
+  return AuthController(ref.watch(authServiceProvider));
 });
 
-final authStateChangesProvider = StreamProvider<User?>((ref) {
-  return FirebaseAuth.instance.authStateChanges();
+final userRoleProvider = Provider<String?>((ref) {
+  final authState = ref.watch(authControllerProvider);
+  return authState.value?.role;
 });
 
+final userDataProvider = Provider<Map<String, dynamic>?>((ref) {
+  final authState = ref.watch(authControllerProvider);
+  return authState.value?.toJson();
+});
 
-
-final userDataProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
-  final authState = ref.watch(authStateChangesProvider);
-  if (authState.value?.uid == null) return null;
-  
-  final doc = await FirebaseFirestore.instance.collection(FirestoreConstants.usersCollection).doc(authState.value!.uid).get();
-  return doc.data();
+final currentUserProvider = Provider<UserModel?>((ref) {
+  final authState = ref.watch(authControllerProvider);
+  return authState.value;
 });

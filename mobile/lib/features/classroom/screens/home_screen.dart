@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:ui'; // For lerpDouble
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:ui';
-
 import '../providers/class_list_provider.dart';
 
 import '../../auth/providers/auth_controller.dart';
-import '../../auth/services/user_service.dart';
+
 import 'student/join_class_dialog.dart';
 import 'class_detail_screen.dart';
 
@@ -26,9 +24,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final sortedClassesAsync = ref.watch(sortedClassesProvider);
-    final userRoleAsync = ref.watch(userRoleProvider); // Watch user role
-    final userDataAsync = ref.watch(userDataProvider); // Watch user data
-    final user = FirebaseAuth.instance.currentUser;
+    final userRole = ref.watch(userRoleProvider); // Direct String?
+    final userData = ref.watch(userDataProvider); // Direct Map?
+    final currentUser = ref.watch(currentUserProvider); // Direct UserModel?
     final theme = Theme.of(context);
 
 
@@ -40,12 +38,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             padding: const EdgeInsets.only(right: 16.0),
             child: InkWell(
               onTap: () {
-                final userName = userDataAsync.value?['name'] ?? 'Kullanıcı';
+                final userName = userData?['name'] ?? 'Kullanıcı';
                 showModalBottomSheet(
                   context: context,
                   backgroundColor: Colors.transparent,
                   builder: (context) => ProfileMenuSheet(
-                    isTeacher: userRoleAsync.value == 'academician',
+                    isTeacher: userRole == 'academician',
                     userName: userName,
                   ),
                 );
@@ -67,7 +65,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: sortedClassesAsync.when(
         data: (classes) {
           if (classes.isEmpty) {
-            final isTeacher = userRoleAsync.value == 'academician';
+            final isTeacher = userRole == 'academician';
             return EmptyStateWidget(
               icon: Icons.class_outlined,
               message: isTeacher 
@@ -107,9 +105,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               classes.insert(newIndex, item);
               
               // Update order in Firestore
-              final newOrder = classes.map((c) => c.id).toList();
-              if (user != null) {
-                ref.read(userServiceProvider).updateClassOrder(user.uid, newOrder);
+
+              if (currentUser != null) {
+                // TODO: Update class order via UserService/CourseService API
+                // ref.read(userServiceProvider).updateClassOrder(currentUser.uid, newOrder);
               }
             },
             itemBuilder: (context, index) {
@@ -203,7 +202,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          final isTeacher = userRoleAsync.value == 'academician';
+          final isTeacher = userRole == 'academician';
           if (isTeacher) {
             showDialog(context: context, builder: (_) => const CreateClassDialog());
           } else {

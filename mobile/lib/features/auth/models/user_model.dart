@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class UserModel {
   final String uid;
   final String name;
@@ -23,30 +21,31 @@ class UserModel {
     this.createdAt,
   });
 
-  factory UserModel.fromMap(Map<String, dynamic> data, String uid) {
+  factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      uid: uid,
-      name: data['name'] ?? '',
-      email: data['email'] ?? '',
-      role: data['role'] ?? 'student',
-      firstName: data['firstName'],
-      lastName: data['lastName'],
-      studentNo: data['studentId'],
-      classOrder:List<String>.from(data['classOrder'] ?? []),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      uid: json['uid']?.toString() ?? '',
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      role: json['role'] ?? 'student',
+      firstName: json['first_name'],
+      lastName: json['last_name'],
+      studentNo: json['student_no'],
+      classOrder: (json['class_order'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
+      'uid': uid,
       'name': name,
       'email': email,
       'role': role,
-      'firstName': firstName,
-      'lastName': lastName,
-      'studentId': studentNo,
-      'classOrder': classOrder,
-      // 'createdAt': FieldValue.serverTimestamp(), // Not usually sent in update
+      'first_name': firstName,
+      'last_name': lastName,
+      'student_no': studentNo,
+      'class_order': classOrder,
+      // 'created_at': createdAt?.toIso8601String(),
     };
   }
 }

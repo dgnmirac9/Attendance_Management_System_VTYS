@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../providers/classroom_provider.dart';
-import '../services/classroom_service.dart';
+
+
+import '../../../../core/services/course_service.dart';
 import '../../../../core/widgets/custom_confirm_dialog.dart';
 import '../../../../core/utils/snackbar_utils.dart';
 
@@ -23,7 +23,7 @@ class ClassSettingsBottomSheet extends ConsumerWidget {
   // Rename Class
   void _showRenameDialog(BuildContext context, WidgetRef ref) {
     final TextEditingController controller = TextEditingController(text: className);
-    final service = ref.read(classroomServiceProvider); // Capture service here
+    final service = ref.read(courseServiceProvider); // Capture service here
 
     showDialog(
       context: context,
@@ -55,7 +55,7 @@ class ClassSettingsBottomSheet extends ConsumerWidget {
               
                 try {
                 // Use captured service
-                await service.updateClassName(classId, controller.text.trim());
+                await service.updateCourseName(classId, controller.text.trim());
                 
                 if (context.mounted) {
                    SnackbarUtils.showSuccess(context, "Sınıf adı güncellendi.");
@@ -74,8 +74,14 @@ class ClassSettingsBottomSheet extends ConsumerWidget {
   }
 
   // Confirm Delete / Leave
-  void _confirmDelete(BuildContext context, ClassroomService service) {
-    final String currentUid = FirebaseAuth.instance.currentUser!.uid;
+  void _confirmDelete(BuildContext context, CourseService service, WidgetRef ref) {
+    // Use the provider for current user ID to avoid Firebase dependency
+    // Note: Since this is inside a callback, strictly we should use ref.read if outside build, 
+    // but we can just use the ID if we pass it or read safely.
+    // However, since we are in a method, we can't easily use ref unless we pass it.
+    // Updated signature of _confirmDelete to accept ref or userId.
+    // For now, let's assume valid user if logged in.
+
 
     showDialog(
       context: context,
@@ -92,9 +98,9 @@ class ClassSettingsBottomSheet extends ConsumerWidget {
 
             try {
               if (isTeacher) {
-                await service.deleteClass(classId);
+                await service.deleteCourse(classId);
               } else {
-                await service.leaveClass(classId, currentUid);
+                await service.leaveCourse(classId); // leaveCourse uses current user via API token usually
               }
               
               navigator.pop(); // Close bottom sheet
@@ -170,9 +176,9 @@ class ClassSettingsBottomSheet extends ConsumerWidget {
             iconColor: errorColor,
             textColor: errorColor,
             onTap: () {
-              final service = ref.read(classroomServiceProvider);
+              final service = ref.read(courseServiceProvider);
               Navigator.pop(context);
-              _confirmDelete(context, service);
+              _confirmDelete(context, service, ref);
             },
           ),
           

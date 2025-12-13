@@ -28,8 +28,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePassword = true; 
   bool _obscureConfirmPassword = true; 
   
-  // Face Data (Placeholder)
-  // List<List<double>> _faceEmbeddings = []; 
+  // Face Data
+  String? _faceImagePath;
 
   @override
   void dispose() {
@@ -50,9 +50,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       MaterialPageRoute(builder: (context) => const FaceCaptureScreen()),
     );
 
-    if (result != null) {
+    if (result != null && result is List<String> && result.isNotEmpty) {
+      setState(() {
+        _faceImagePath = result.first;
+      });
       if (mounted) {
-         SnackbarUtils.showSuccess(context, "Yüz verisi alındı (Simüle).");
+         SnackbarUtils.showSuccess(context, "Yüz verisi alındı.");
       }
     }
   }
@@ -60,6 +63,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   // --- REGISTER FUNCTION ---
   void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
+      if (_isStudent && _faceImagePath == null) {
+        SnackbarUtils.showError(context, "Lütfen yüz verisi ekleyin.");
+        return;
+      }
+
       try {
         await ref.read(authControllerProvider.notifier).signUp(
           email: _emailController.text.trim(),
@@ -68,7 +76,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           firstName: _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim(),
           studentNo: _isStudent ? _studentNoController.text.trim() : null,
-          // faceEmbeddings: _isStudent ? _faceEmbeddings : null, 
+          faceImagePath: _faceImagePath,
         );
         
         if (mounted) {

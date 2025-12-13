@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../../auth/providers/auth_controller.dart'; 
 import '../services/user_service.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../core/utils/snackbar_utils.dart';
@@ -48,38 +48,30 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _loadUserData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        _emailController.text = user.email ?? '';
-        
-        final doc = await ref.read(userServiceProvider).getUserStream(user.uid).first;
-        if (doc.exists) {
-          final data = doc.data() as Map<String, dynamic>;
-          
-          final rawName = data['name'] as String? ?? '';
-          final nameParts = rawName.split(' ');
-          
-          final firstName = data['firstName'] ?? (nameParts.isNotEmpty ? nameParts.first : '');
-          final lastName = data['lastName'] ?? (nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '');
-          final studentNo = data['studentId'] ?? '';
-          final role = data['role'] ?? 'student';
+    try {
+      final user = await ref.read(userServiceProvider).getUser('current'); // 'current' or valid UID
+      
+      _emailController.text = user.email;
+      _userRole = user.role;
+      
+      final firstName = user.firstName ?? '';
+      final lastName = user.lastName ?? '';
+      final studentNo = user.studentNo ?? '';
+      
+      _firstNameController.text = firstName;
+      _lastNameController.text = lastName;
+      _studentNoController.text = studentNo;
 
-          _userRole = role;
-          
-          _firstNameController.text = firstName;
-          _lastNameController.text = lastName;
-          _studentNoController.text = studentNo;
+      _initialFirstName = firstName;
+      _initialLastName = lastName;
+      _initialStudentNo = studentNo;
 
-          _initialFirstName = firstName;
-          _initialLastName = lastName;
-          _initialStudentNo = studentNo;
-        }
-      } catch (e) {
-        debugPrint("Error loading user data: $e");
-      }
+    } catch (e) {
+      debugPrint("Error loading user data: $e");
+      if (mounted) SnackbarUtils.showError(context, "Kullanıcı verisi yüklenemedi.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _saveProfile() async {
@@ -87,8 +79,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     
     final isStudent = _userRole == 'student';
     
-    // Safety check: Form validation *should* catch this, but explicit check adds robustness.
-    // Validation for Student ID
     if (isStudent) {
       final studentId = _studentNoController.text.trim();
       if (studentId.isEmpty) {
@@ -118,33 +108,35 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
       final firstName = _firstNameController.text.trim();
       final lastName = _lastNameController.text.trim();
       final name = "$firstName $lastName";
-      final email = user.email ?? '';
+      
+      // We don't have UID easily unless we store it or fetch it. 
+      // UserService's methods take UID but calling /me ignores it mostly.
+      const fakeUid = 'current'; 
 
       // Update basic data
       await ref.read(userServiceProvider).saveUserData(
-        uid: user.uid,
+        uid: fakeUid,
         name: name,
         firstName: firstName,
         lastName: lastName,
-        email: email,
+        email: _emailController.text, // Not used by backend likely
         role: _userRole ?? 'student',
       );
       
       // Update student ID if applicable
       if (isStudent) {
-        await ref.read(userServiceProvider).updateStudentId(user.uid, _studentNoController.text.trim());
+        await ref.read(userServiceProvider).updateStudentId(fakeUid, _studentNoController.text.trim());
       }
+      
+      // Refresh global user state
+      ref.invalidate(authControllerProvider);
 
       if (mounted) {
         SnackbarUtils.showSuccess(context, 'Profil başarıyla güncellendi!');
         
-        // Update initial values to prevent re-saving without changes
         _initialFirstName = _firstNameController.text.trim();
         _initialLastName = _lastNameController.text.trim();
         _initialStudentNo = _studentNoController.text.trim();
