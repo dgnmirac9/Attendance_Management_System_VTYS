@@ -27,7 +27,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _isStudent = false;
   bool _obscurePassword = true; 
   bool _obscureConfirmPassword = true; 
-  
+  bool _kvkkApproved = false; // KVKK onay durumu
   // Face Data (Placeholder)
   // List<List<double>> _faceEmbeddings = []; 
 
@@ -60,6 +60,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   // --- REGISTER FUNCTION ---
   void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
+     if (!_kvkkApproved) {//---Kullanıcı onay kutusunu işaretlemeden "Kayıt Ol" düğmesine basarsa, kayıt işlemini durdurmalıyız.
+                if (mounted) {
+                  SnackbarUtils.showError(context, 'Kayıt olmak için KVKK metnini onaylamanız gerekmektedir.');
+                }
+                return; // Onay yoksa işlemi durdur
+              }
       try {
         await ref.read(authControllerProvider.notifier).signUp(
           email: _emailController.text.trim(),
@@ -261,7 +267,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ],
 
                       const SizedBox(height: 24),
-                      
+                                            // --- KVKK ONAY KUTUSU ---
+                                                                  Row(
+                                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                                    children: [
+                                                                      Checkbox(
+                                                                        value: _kvkkApproved,
+                                                                        onChanged: (bool? newValue) {
+                                                                          setState(() {
+                                                                            _kvkkApproved = newValue ?? false;
+                                                                          });
+                                                                        },
+                                                                      ),
+                                                                      const SizedBox(width: 8),
+                                                                      Expanded(
+                                                                        child: Padding(
+                                                                          padding: const EdgeInsets.only(top: 12.0),
+                                                                          child: GestureDetector(
+                                                                            onTap: () => setState(() => _kvkkApproved = !_kvkkApproved),
+                                                                            child: const Text(
+                                                                              'Kişisel verilerimin işlenmesine ilişkin KVKK Aydınlatma Metni\'ni okudum ve onaylıyorum.',
+                                                                              style: TextStyle(fontSize: 14),
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
                       // KAYIT OL BUTONU
                       ElevatedButton(
                         onPressed: isLoading ? null : _handleRegister, 
