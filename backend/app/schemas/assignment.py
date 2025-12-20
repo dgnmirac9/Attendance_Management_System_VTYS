@@ -1,12 +1,15 @@
 """Assignment schemas for request/response validation"""
 
-from pydantic import BaseModel, Field
+"""Assignment schemas for request/response validation"""
+
+from app.schemas.base import CamelCaseModel
+from pydantic import Field
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
 
 
-class AssignmentBase(BaseModel):
+class AssignmentBase(CamelCaseModel):
     """Base assignment schema"""
     title: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = None
@@ -18,7 +21,7 @@ class AssignmentCreate(AssignmentBase):
     course_id: int = Field(..., gt=0)
 
 
-class AssignmentUpdate(BaseModel):
+class AssignmentUpdate(CamelCaseModel):
     """Schema for updating an assignment"""
     title: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = None
@@ -43,12 +46,12 @@ class AssignmentDetailResponse(AssignmentResponse):
     submission_rate: float
 
 
-class AssignmentSubmit(BaseModel):
+class AssignmentSubmit(CamelCaseModel):
     """Schema for submitting an assignment"""
     file_url: Optional[str] = Field(None, max_length=255)
 
 
-class AssignmentSubmissionResponse(BaseModel):
+class AssignmentSubmissionResponse(CamelCaseModel):
     """Schema for assignment submission response"""
     submission_id: int
     assignment_id: int
@@ -70,19 +73,19 @@ class AssignmentSubmissionDetailResponse(AssignmentSubmissionResponse):
     assignment_due_date: datetime
 
 
-class GradeUpdate(BaseModel):
+class GradeUpdate(CamelCaseModel):
     """Schema for updating assignment grade"""
     grade: Decimal = Field(..., ge=0, le=100)
 
 
-class GradeUpdateResponse(BaseModel):
+class GradeUpdateResponse(CamelCaseModel):
     """Schema for grade update response"""
     submission_id: int
     grade: Decimal
     message: str = "Grade updated successfully"
 
 
-class StudentAssignmentResponse(BaseModel):
+class StudentAssignmentResponse(CamelCaseModel):
     """Schema for student's assignment view"""
     assignment_id: int
     title: str
@@ -95,7 +98,7 @@ class StudentAssignmentResponse(BaseModel):
         from_attributes = True
 
 
-class StudentAssignmentsListResponse(BaseModel):
+class StudentAssignmentsListResponse(CamelCaseModel):
     """Schema for list of student's assignments"""
     course_id: int
     course_name: str

@@ -6,7 +6,8 @@ import '../../auth/providers/auth_controller.dart';
 import '../models/class_model.dart';
 
 // Provides the list of courses for the current user (Future-based)
-final userClassesFutureProvider = FutureProvider.autoDispose<List<ClassModel>>((ref) async {
+// FIXED: Removed autoDispose to prevent "Cannot use ref after disposed" errors
+final userClassesFutureProvider = FutureProvider<List<ClassModel>>((ref) async {
   final user = ref.watch(currentUserProvider);
   if (user == null) {
     return [];
@@ -20,14 +21,14 @@ class ClassroomController extends AsyncNotifier<void> {
     // No initial state
   }
 
-  Future<void> createClass({required String className, required String teacherName}) async {
+  Future<void> createClass({required String courseName, required String semester}) async {
     state = const AsyncValue.loading();
     try {
       final user = ref.read(currentUserProvider);
       if (user == null) throw Exception("Kullanıcı oturumu açık değil");
 
       
-      await ref.read(courseServiceProvider).createCourse(className, "${user.name} Sınıfı"); // Code generation might be inside or passed
+      await ref.read(courseServiceProvider).createCourse(courseName, semester);
       
       // Invalidate list to refresh
       ref.invalidate(userClassesFutureProvider);

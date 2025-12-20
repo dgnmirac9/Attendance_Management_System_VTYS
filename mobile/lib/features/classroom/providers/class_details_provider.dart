@@ -7,7 +7,7 @@ import '../models/class_model.dart';
 import '../../auth/models/user_model.dart';
 
 // 1. Class Metadata Future
-final classDetailsProvider = FutureProvider.family<ClassModel, String>((ref, classId) async {
+final classDetailsProvider = FutureProvider.autoDispose.family<ClassModel, String>((ref, classId) async {
   final service = ref.watch(courseServiceProvider);
   return service.getCourseDetails(classId);
 });

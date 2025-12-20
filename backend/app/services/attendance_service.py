@@ -18,11 +18,10 @@ from app.models.course import Course, CourseEnrollment
 from app.models.user import Student
 from app.services.face_service import FaceService
 from app.core.exceptions import (
-    AttendanceNotFoundError,
-    AttendanceSessionClosedError,
-    StudentNotEnrolledError,
     DuplicateAttendanceError,
-    FaceVerificationError
+    FaceVerificationError,
+    AppException,
+    AttendanceNotFoundError
 )
 
 
@@ -41,7 +40,7 @@ class AttendanceService:
         instructor_id: int,
         session_name: str,
         description: Optional[str] = None,
-        duration_minutes: int = 15
+        duration_minutes: Optional[int] = None
     ) -> Attendance:
         """
         Yeni bir yoklama oturumu oluşturur
@@ -51,7 +50,7 @@ class AttendanceService:
             instructor_id: Eğitmen ID'si
             session_name: Oturum adı
             description: Oturum açıklaması
-            duration_minutes: Oturum süresi (dakika)
+            duration_minutes: Oturum süresi (dakika), None = sınırsız
             
         Returns:
             Attendance: Oluşturulan yoklama oturumu
@@ -73,7 +72,11 @@ class AttendanceService:
             raise AttendanceNotFoundError("Course not found or unauthorized")
         
         # Yoklama oturumu oluştur
-        end_time = datetime.utcnow() + timedelta(minutes=duration_minutes)
+        if duration_minutes is None:
+            # Unlimited duration - set a far future date
+            end_time = datetime.utcnow() + timedelta(days=365)
+        else:
+            end_time = datetime.utcnow() + timedelta(minutes=duration_minutes)
         
         attendance = Attendance(
             course_id=course_id,
@@ -157,6 +160,43 @@ class AttendanceService:
                 Attendance.end_time > datetime.utcnow()
             )
         ).order_by(desc(Attendance.start_time)).all()
+
+    def delete_attendance_session(self, attendance_id: int, instructor_id: int) -> bool:
+        """
+        Yoklama oturumunu siler
+        
+        Args:
+            attendance_id: Yoklama oturum ID'si
+            instructor_id: Eğitmen ID'si
+            
+        Returns:
+            bool: Silme işlemi başarılıysa True
+            
+        Raises:
+            AttendanceNotFoundError: Oturum bulunamadığında
+            UnauthorizedError: Eğitmen yetkisi yoksa
+        """
+        attendance = self.db.query(Attendance).join(Course).filter(
+            and_(
+                Attendance.attendance_id == attendance_id,
+                Course.instructor_id == instructor_id
+            )
+        ).first()
+        
+        if not attendance:
+            raise AttendanceNotFoundError("Attendance session not found or unauthorized")
+        
+        # İlişkili kayıtları da silmek gerekebilir (Cascade delete varsa otomatik olur)
+        # SQLAlchemy modelinde cascade tanımlı değilse manuel silmek gerekir.
+        # Güvenli olması için manuel siliyoruz.
+        self.db.query(AttendanceRecord).filter(
+            AttendanceRecord.attendance_id == attendance_id
+        ).delete()
+        
+        self.db.delete(attendance)
+        self.db.commit()
+        
+        return True
     
     # ==================== FACE-BASED CHECK-IN ====================
     
@@ -164,7 +204,8 @@ class AttendanceService:
         self,
         attendance_id: int,
         student_id: int,
-        face_image_data: bytes
+        face_image_data: bytes,
+        qr_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Yüz tanıma ile yoklama alır
@@ -193,6 +234,17 @@ class AttendanceService:
         current_time = datetime.utcnow()
         if not attendance.is_active or current_time > attendance.end_time:
             raise AttendanceSessionClosedError("Attendance session is closed")
+            
+        # QR Token verification
+        if attendance.current_qr_token:
+            if not qr_token:
+                 raise AppException(message="QR token required", status_code=400)
+            
+            if qr_token != attendance.current_qr_token:
+                 raise AppException(message="Invalid QR token", status_code=400)
+            
+            if attendance.qr_token_expires_at and current_time > attendance.qr_token_expires_at:
+                 raise AppException(message="QR token expired", status_code=400)
         
         # Öğrencinin derse kayıtlı olup olmadığını kontrol et
         enrollment = self.db.query(CourseEnrollment).filter(
@@ -409,4 +461,31 @@ class AttendanceService:
             "enrolled_students": enrolled_students,
             "total_attendance_records": total_records,
             "attendance_rate_percentage": round(attendance_rate, 2)
+        }
+
+    def generate_qr_token(self, attendance_id: int, instructor_id: int) -> Dict[str, Any]:
+        """
+        Dinamik QR token üretir
+        """
+        attendance = self.db.query(Attendance).join(Course).filter(
+            and_(
+                Attendance.attendance_id == attendance_id,
+                Course.instructor_id == instructor_id
+            )
+        ).first()
+        
+        if not attendance:
+            raise AttendanceNotFoundError("Attendance session not found or unauthorized")
+            
+        import secrets
+        token = secrets.token_urlsafe(16)
+        attendance.current_qr_token = token
+        attendance.qr_token_expires_at = datetime.utcnow() + timedelta(seconds=10)
+        
+        self.db.commit()
+        
+        return {
+            "qr_token": token,
+            "expires_at": attendance.qr_token_expires_at,
+            "attendance_id": attendance_id
         }

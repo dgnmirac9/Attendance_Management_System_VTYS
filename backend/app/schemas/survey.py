@@ -1,11 +1,14 @@
 """Survey schemas for request/response validation"""
 
-from pydantic import BaseModel, Field
+"""Survey schemas for request/response validation"""
+
+from app.schemas.base import CamelCaseModel
+from pydantic import Field
 from typing import Optional, List
 from datetime import datetime
 
 
-class SurveyBase(BaseModel):
+class SurveyBase(CamelCaseModel):
     """Base survey schema"""
     question: str = Field(..., min_length=1)
 
@@ -15,7 +18,7 @@ class SurveyCreate(SurveyBase):
     course_id: int = Field(..., gt=0)
 
 
-class SurveyUpdate(BaseModel):
+class SurveyUpdate(CamelCaseModel):
     """Schema for updating a survey"""
     question: Optional[str] = Field(None, min_length=1)
 
@@ -38,12 +41,12 @@ class SurveyDetailResponse(SurveyResponse):
     instructor_name: str
 
 
-class SurveyRespondRequest(BaseModel):
+class SurveyRespondRequest(CamelCaseModel):
     """Schema for responding to a survey"""
     answer: str = Field(..., min_length=1)
 
 
-class SurveyResponseSubmission(BaseModel):
+class SurveyResponseSubmission(CamelCaseModel):
     """Schema for survey response submission"""
     response_id: int
     survey_id: int
@@ -51,7 +54,7 @@ class SurveyResponseSubmission(BaseModel):
     message: str = "Survey response submitted successfully"
 
 
-class SurveyResponseDetail(BaseModel):
+class SurveyResponseDetail(CamelCaseModel):
     """Schema for individual survey response"""
     response_id: int
     student_id: int
@@ -64,7 +67,7 @@ class SurveyResponseDetail(BaseModel):
         from_attributes = True
 
 
-class SurveyResponsesListResponse(BaseModel):
+class SurveyResponsesListResponse(CamelCaseModel):
     """Schema for list of survey responses"""
     survey_id: int
     question: str

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../classroom/providers/class_details_provider.dart'; // Import for invalidation
 import '../../../core/services/attendance_service.dart'; // Added import
 import '../../auth/providers/auth_controller.dart';
 import '../widgets/student_detail_dialog.dart';
@@ -82,10 +83,13 @@ class _AttendanceDetailScreenState extends ConsumerState<AttendanceDetailScreen>
         onConfirm: () async {
             try {
               await ref.read(attendanceServiceProvider).deleteAttendanceSession(widget.sessionId);
-              if (mounted) {
-                Navigator.pop(context); // Close screen (using State context)
-                SnackbarUtils.showSuccess(context, "Yoklama kaydı silindi.");
-              }
+                // Invalidate history provider to refresh the list on previous screen
+                ref.invalidate(classHistoryProvider(widget.classId));
+                
+                if (mounted) {
+                  Navigator.pop(context); // Close screen (using State context)
+                  SnackbarUtils.showSuccess(context, "Yoklama kaydı silindi.");
+                }
             } catch (e) {
               if (mounted) {
                 SnackbarUtils.showError(context, "Hata: $e");

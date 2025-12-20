@@ -20,15 +20,15 @@ class UserService {
     String role = 'student',
   }) async {
     try {
-      await _apiClient.dio.put('/users/me', data: {
-        'name': name,
-        'first_name': firstName,
-        'last_name': lastName,
-        'email': email, // Email usually not updatable here, but passing if API expects
-        // 'role': role, // Role usually not updatable by user
+      // Use role-based endpoints
+      final endpoint = role == 'student' ? '/students/me' : '/instructors/me';
+      
+      await _apiClient.dio.put(endpoint, data: {
+        'full_name': name,
+        // Backend expects full_name based on students.py and instructors.py
       });
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Profil güncellenemedi.';
+      throw e.response?.data['detail'] ?? 'Profil güncellenemedi.';
     }
   }
 

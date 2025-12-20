@@ -19,7 +19,8 @@ cryptography==41.0.7
 deepface==0.0.79
 opencv-python==4.8.1.78
 tf-keras==2.15.0
-tensorflow==2.15.0
+tensorflow>=2.15.0
+numpy<2.0.0
 
 # Validation
 pydantic==2.5.0

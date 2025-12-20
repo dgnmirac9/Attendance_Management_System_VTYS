@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_controller.dart'; 
 import '../services/user_service.dart';
-import '../../../../core/utils/validators.dart';
+
 import '../../../../core/utils/snackbar_utils.dart';
 import '../widgets/change_password_dialog.dart';
+import '../../../../core/services/face_service.dart';
+import '../screens/face_capture_screen.dart';
 
 import '../../../../core/widgets/skeleton_form_widget.dart';
 
@@ -30,7 +31,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   // Initial values for change detection
   String _initialFirstName = '';
   String _initialLastName = '';
-  String _initialStudentNo = '';
+
 
   @override
   void initState() {
@@ -62,9 +63,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       _lastNameController.text = lastName;
       _studentNoController.text = studentNo;
 
+
       _initialFirstName = firstName;
       _initialLastName = lastName;
-      _initialStudentNo = studentNo;
 
     } catch (e) {
       debugPrint("Error loading user data: $e");
@@ -94,12 +95,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     bool hasChanges = _firstNameController.text.trim() != _initialFirstName ||
         _lastNameController.text.trim() != _initialLastName;
 
-    if (isStudent) {
-      if (_studentNoController.text.trim() != _initialStudentNo) {
-        hasChanges = true;
-      }
-    }
-
     if (!hasChanges) {
       SnackbarUtils.showInfo(context, 'Herhangi bir değişiklik yapılmadı.');
       return;
@@ -126,11 +121,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         role: _userRole ?? 'student',
       );
       
-      // Update student ID if applicable
-      if (isStudent) {
-        await ref.read(userServiceProvider).updateStudentId(fakeUid, _studentNoController.text.trim());
-      }
-      
       // Refresh global user state
       ref.invalidate(authControllerProvider);
 
@@ -139,7 +129,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         
         _initialFirstName = _firstNameController.text.trim();
         _initialLastName = _lastNameController.text.trim();
-        _initialStudentNo = _studentNoController.text.trim();
       }
     } catch (e) {
       if (mounted) {
@@ -149,6 +138,41 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  Future<void> _updateFaceData() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      // Navigate to face capture screen (returns List<String> of image paths)
+      final images = await Navigator.push<List<String>>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const FaceCaptureScreen(),
+        ),
+      );
+
+      if (images == null || images.isEmpty || !mounted) {
+        setState(() => _isLoading = false);
+        return; // User cancelled or no images
+      }
+
+      // Register face via FaceService (use first image)
+      final faceService = FaceService();
+      await faceService.registerFace(images.first);
+
+      if (mounted) {
+        SnackbarUtils.showSuccess(context, 'Yüz verisi başarıyla güncellendi.');
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackbarUtils.showError(context, e.toString().replaceAll('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +233,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
                       // Role Info
                       Text(
-                        _userRole == 'academician' ? 'Öğretim Görevlisi' : 'Öğrenci',
+                        _userRole == 'instructor' ? 'Öğretim Görevlisi' : 'Öğrenci',
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,
@@ -220,16 +244,26 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       // Name
                       TextFormField(
                         controller: _firstNameController,
-                        decoration: const InputDecoration(labelText: 'Ad', prefixIcon: Icon(Icons.person)),
-                        validator: (val) => validateRequired(val, fieldName: 'Ad'),
+                        maxLength: 50,
+                        decoration: const InputDecoration(labelText: 'Ad', prefixIcon: Icon(Icons.person), counterText: ""),
+                        validator: (val) {
+                           if (val == null || val.trim().isEmpty) return 'Ad gerekli';
+                           if (val.length < 2) return 'En az 2 karakter';
+                           return null;
+                        },
                       ),
                       const SizedBox(height: 16),
         
                       // Surname
                       TextFormField(
                         controller: _lastNameController,
-                        decoration: const InputDecoration(labelText: 'Soyad', prefixIcon: Icon(Icons.person_outline)),
-                        validator: (val) => validateRequired(val, fieldName: 'Soyad'),
+                        maxLength: 50,
+                        decoration: const InputDecoration(labelText: 'Soyad', prefixIcon: Icon(Icons.person_outline), counterText: ""),
+                        validator: (val) {
+                           if (val == null || val.trim().isEmpty) return 'Soyad gerekli';
+                           if (val.length < 2) return 'En az 2 karakter';
+                           return null;
+                        },
                       ),
                       const SizedBox(height: 16),
         
@@ -249,18 +283,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       if (isStudent) ...[
                         TextFormField(
                           controller: _studentNoController,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(9),
-                          ],
-                          maxLength: 9,
-                          decoration: const InputDecoration(labelText: 'Öğrenci Numarası', prefixIcon: Icon(Icons.badge), counterText: ""),
-                          validator: (val) {
-                            if (val == null || val.isEmpty) return 'Zorunlu';
-                            if (val.length != 9) return '9 haneli olmalı';
-                            return null;
-                          },
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Öğrenci Numarası', 
+                            prefixIcon: Icon(Icons.badge),
+                            helperText: 'Öğrenci numarası değiştirilemez.',
+                          ),
                         ),
                         const SizedBox(height: 32),
                       ],
@@ -287,6 +315,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         icon: const Icon(Icons.lock_reset),
                         label: const Text('Şifreyi Değiştir'),
                       ),
+                      const SizedBox(height: 8),
+                      
+                      // Face Data Update Button (Student Only)
+                      if (isStudent)
+                        TextButton.icon(
+                          onPressed: _isLoading ? null : _updateFaceData,
+                          icon: const Icon(Icons.face),
+                          label: const Text('Yüz Verisi Güncelle'),
+                        ),
                     ],
                   ),
                 ),

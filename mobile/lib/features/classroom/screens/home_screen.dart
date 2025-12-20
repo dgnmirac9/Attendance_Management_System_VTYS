@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui'; // For lerpDouble
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/class_list_provider.dart';
+import '../providers/classroom_provider.dart'; // ADDED - for userClassesFutureProvider
 
 import '../../auth/providers/auth_controller.dart';
 
@@ -20,7 +21,28 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+  
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh class list when returning to app/screen
+      ref.invalidate(userClassesFutureProvider);
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     final sortedClassesAsync = ref.watch(sortedClassesProvider);
@@ -43,7 +65,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   context: context,
                   backgroundColor: Colors.transparent,
                   builder: (context) => ProfileMenuSheet(
-                    isTeacher: userRole == 'academician',
+                    isTeacher: userRole == 'instructor',
                     userName: userName,
                   ),
                 );
@@ -65,7 +87,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: sortedClassesAsync.when(
         data: (classes) {
           if (classes.isEmpty) {
-            final isTeacher = userRole == 'academician';
+            final isTeacher = userRole == 'instructor';
             return EmptyStateWidget(
               icon: Icons.class_outlined,
               message: isTeacher 
@@ -74,10 +96,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             );
           }
 
-          return ReorderableListView.builder(
-            padding: const EdgeInsets.all(16.0),
-            itemCount: classes.length,
-            proxyDecorator: (child, index, animation) {
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(userClassesFutureProvider);
+              // Wait for refresh to complete
+              await ref.read(userClassesFutureProvider.future);
+            },
+            child: ReorderableListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: classes.length,
+              proxyDecorator: (child, index, animation) {
               return AnimatedBuilder(
                 animation: animation,
                 builder: (BuildContext context, Widget? child) {
@@ -107,7 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // Update order in Firestore
 
               if (currentUser != null) {
-                // TODO: Update class order via UserService/CourseService API
+                // Note: Class order update not yet implemented in backend
                 // ref.read(userServiceProvider).updateClassOrder(currentUser.uid, newOrder);
               }
             },
@@ -126,8 +154,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   margin: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
-                    onTap: () {
-                      Navigator.push(
+                    onTap: () async {
+                      final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => ClassDetailScreen(
@@ -137,6 +165,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                       );
+                      
+                      // If course was deleted, refresh list
+                      if (result == true) {
+                        ref.invalidate(userClassesFutureProvider);
+                      }
                     },
                     child: Container(
                       height: 120,
@@ -195,14 +228,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               );
             },
-          );
+          ),
+          ); // Close RefreshIndicator
         },
         loading: () => const SkeletonListWidget(),
         error: (e, s) => Center(child: Text('Hata: $e')),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          final isTeacher = userRole == 'academician';
+          final isTeacher = userRole == 'instructor';
           if (isTeacher) {
             showDialog(context: context, builder: (_) => const CreateClassDialog());
           } else {

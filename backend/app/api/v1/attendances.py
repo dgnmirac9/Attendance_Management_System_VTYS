@@ -37,10 +37,12 @@ class AttendanceSessionCreate(BaseModel):
     course_id: int = Field(..., description="Course ID")
     session_name: str = Field(..., min_length=1, max_length=100, description="Session name")
     description: Optional[str] = Field(None, max_length=500, description="Session description")
-    duration_minutes: int = Field(15, ge=5, le=120, description="Session duration in minutes")
+    duration_minutes: Optional[int] = Field(None, ge=5, le=240, description="Session duration (None = unlimited until manually closed)")
 
 
-class AttendanceSessionResponse(BaseModel):
+from app.schemas.base import CamelCaseModel
+
+class AttendanceSessionResponse(CamelCaseModel):
     """Attendance session response"""
     attendance_id: int
     course_id: int
@@ -683,3 +685,103 @@ def get_course_attendance_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get attendance statistics: {str(e)}"
         )
+
+# Mobile App Endpoint for Attendance History
+@router.get("/mobile/course/{course_id}/sessions")
+def get_mobile_course_sessions(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_sync)
+):
+    """
+    Get all attendance sessions for a course (formatted for mobile)
+    """
+    from app.models.attendance import Attendance, AttendanceRecord
+    from app.services.course_service import course_service
+    from sqlalchemy import desc
+    
+    # Check permissions
+    if current_user.role == "instructor":
+        instructor = user_service.get_instructor_profile_sync(db, current_user.user_id)
+        if not instructor:
+            raise HTTPException(status_code=403, detail="Instructor profile not found")
+        
+        # Verify course ownership
+        course = course_service.get_course_by_id_sync(db, course_id)
+        if not course or course.instructor_id != instructor.instructor_id:
+             raise HTTPException(status_code=403, detail="Not authorized for this course")
+             
+    elif current_user.role == "student":
+        student = user_service.get_student_profile_sync(db, current_user.user_id)
+        if not student:
+            raise HTTPException(status_code=403, detail="Student profile not found")
+            
+        # Verify enrollment (Simplified)
+        pass
+        
+    else:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    try:
+        # Get all sessions for this course
+        sessions = db.query(Attendance).filter(
+            Attendance.course_id == course_id
+        ).order_by(desc(Attendance.created_at)).all()
+        
+        results = []
+        for session in sessions:
+            attendee_count = db.query(AttendanceRecord).filter(
+                AttendanceRecord.attendance_id == session.attendance_id
+            ).count()
+            
+            # Check if current user attended (for students)
+            is_present = False
+            if current_user.role == "student":
+                student = user_service.get_student_profile_sync(db, current_user.user_id)
+                if student:
+                    for record in session.records:
+                        if record.student_id == student.student_id:
+                            is_present = True
+                            break
+            
+            results.append({
+                "attendanceId": session.attendance_id,
+                "startTime": session.start_time.isoformat(),
+                "sessionName": session.session_name,
+                "attendeeCount": attendee_count,
+                "isActive": session.is_active,
+                "attendees": [current_user.user_id] if is_present else []
+            })
+        
+        return results
+    except Exception as e:
+        print(f"Error fetching sessions: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{attendance_id}", status_code=status.HTTP_200_OK)
+def delete_attendance(
+    attendance_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_sync),
+):
+    """Delete an attendance session"""
+    if current_user.role != "instructor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only instructors can delete attendance sessions"
+        )
+        
+    instructor = user_service.get_instructor_profile_sync(db, current_user.user_id)
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor profile not found")
+        
+    try:
+        attendance_service_instance = AttendanceService(db)
+        success = attendance_service_instance.delete_attendance_session(attendance_id, instructor.instructor_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Attendance session not found or unauthorized")
+            
+        return {"message": "Attendance session deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

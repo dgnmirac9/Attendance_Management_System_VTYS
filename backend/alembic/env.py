@@ -18,7 +18,7 @@ from app.models.user import User, Student, Instructor
 from app.models.course import Course, CourseEnrollment
 from app.models.attendance import Attendance, AttendanceRecord
 from app.models.assignment import Assignment, AssignmentSubmission
-from app.models.content import Announcement, StudentSharedNote, Survey, SurveyResponse
+from app.models.content import Announcement, Survey, SurveyResponse
 from app.models.token import Token
 
 # this is the Alembic Config object, which provides

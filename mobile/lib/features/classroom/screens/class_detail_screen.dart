@@ -55,13 +55,21 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     
     // Determine if user is teacher based on class data or global auth state
     // For now, let's check if the current user is the teacher of this class
-    final isTeacher = classDetailsAsync.value != null 
-        ? classDetailsAsync.value!.teacherId == _currentUid
+    final teacherId = classDetailsAsync.value?.teacherId;
+    final isTeacher = teacherId != null 
+        ? teacherId == _currentUid
         : false;
+        
+    if (classDetailsAsync.value != null) {
+       // ignore: avoid_print
+       print('DEBUG: isTeacher Check -> Class TeacherID: "$teacherId" vs Current UserID: "$_currentUid" => Result: $isTeacher');
+    }
+
 
     final teacherName = classDetailsAsync.value != null
         ? classDetailsAsync.value!.teacherName
         : 'Yükleniyor...';
+    
 
     return Scaffold(
       body: SafeArea(
@@ -137,57 +145,22 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                       ),
                       child: IconButton(
                         icon: const Icon(Icons.settings, color: Colors.white, size: 20),
-                        onPressed: () {
-                          showModalBottomSheet(
+                        onPressed: () async {
+                          final currentClassName = classDetailsAsync.value?.className ?? widget.className;
+                          final result = await showModalBottomSheet<bool>(
                             context: context,
                             isScrollControlled: true,
                             backgroundColor: Colors.transparent,
-                            builder: (context) {
-                              final currentClassName = classDetailsAsync.value?.className ?? widget.className;
-                              // The provided snippet was syntactically incorrect for this location.
-                              // Assuming the intent was to pass the service for deletion to the bottom sheet,
-                              // or to perform deletion logic within the bottom sheet itself.
-                              // For now, I'm making the minimal change to replace the provider name
-                              // if it were to be used here, but keeping the original structure
-                              // as the snippet provided would break compilation.
-                              // If the intent was to delete the course *before* showing the bottom sheet,
-                              // that would require a different structural change.
-                              // As per instruction to keep syntactically correct, I'm not inserting the broken snippet.
-                              // The instruction only mentioned replacing provider and method call,
-                              // which implies the logic for deletion would be handled elsewhere,
-                              // possibly within the ClassSettingsBottomSheet itself.
-                              // If the user intended to delete the course directly here,
-                              // the structure would need to be:
-                              // onPressed: () async {
-                              //   try {
-                              //     final service = ref.read(courseServiceProvider);
-                              //     await service.deleteCourse(widget.classId);
-                              //     if (context.mounted) Navigator.of(context).pop(); // Go back after deletion
-                              //   } catch (e) {
-                              //     if (context.mounted) SnackbarUtils.showError(context, "Error deleting course: $e");
-                              //   }
-                              // }
-                              // However, the instruction's snippet was inside the builder for the bottom sheet,
-                              // which is not where deletion logic would typically reside directly.
-                              // Therefore, I'm assuming the instruction was a partial snippet
-                              // for a change that would occur *within* the ClassSettingsBottomSheet
-                              // or a similar context, and not directly here.
-                              // Since the instruction was to "replace classroomServiceProvider with courseServiceProvider
-                              // and update method call to deleteCourse", and the snippet was malformed for this location,
-                              // I'm leaving the `ClassSettingsBottomSheet` call as is,
-                              // as the instruction doesn't provide a syntactically correct way to integrate
-                              // the deletion logic *at this specific point* while still showing the bottom sheet.
-                              // If the intent was to delete the course *instead* of showing the bottom sheet,
-                              // the `onPressed` would be completely different.
-                              // Given the context of "ClassSettingsBottomSheet", it's more likely
-                              // the deletion logic would be *inside* that bottom sheet.
-                              return ClassSettingsBottomSheet(
-                                className: currentClassName,
-                                classId: widget.classId,
-                                isTeacher: isTeacher,
-                              );
-                            },
+                            builder: (context) => ClassSettingsBottomSheet(
+                              classId: widget.classId,
+                              className: currentClassName,
+                              isTeacher: isTeacher,
+                            ),
                           );
+                          
+                          if (result == true && context.mounted) {
+                            Navigator.of(context).pop(true);
+                          }
                         },
                       ),
                     ),
@@ -392,7 +365,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         data: (sessionMap) {
           if (sessionMap == null) return null; // No active session
           
-          final sessionId = sessionMap['id'];
+          final sessionId = sessionMap['attendanceId'];
           
           // Check if already attended?
           final attendanceStatusAsync = ref.watch(userAttendanceStatusProvider(
@@ -479,8 +452,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
             final data = announcements[index];
             // Handle date parsing from API string or null
             DateTime date = DateTime.now();
-            if (data['created_at'] != null) {
-              date = DateTime.tryParse(data['created_at']) ?? DateTime.now();
+            if (data['createdAt'] != null) {
+              date = DateTime.tryParse(data['createdAt']) ?? DateTime.now();
             }
             final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(date);
 
@@ -629,17 +602,18 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
             final data = sessions[index]; // Map
             
             DateTime date = DateTime.now();
-            if (data['start_time'] != null) {
-               date = DateTime.tryParse(data['start_time']) ?? DateTime.now();
+            if (data['startTime'] != null) {
+               date = DateTime.tryParse(data['startTime']) ?? DateTime.now();
             }
 
-            final attendeeUids = List<String>.from(data['attendees'] ?? []);
+            final attendeeUids = (data['attendees'] as List? ?? []).map((e) => e.toString()).toList();
+            final int totalCount = data['attendeeCount'] ?? attendeeUids.length;
             
             return _buildAttendanceCard(
               context: context,
               isTeacher: isTeacher,
               date: date,
-              attendeeCount: attendeeUids.length,
+              attendeeCount: totalCount,
               isPresent: attendeeUids.contains(_currentUid),
               onTap: isTeacher ? () {
                 Navigator.push(
@@ -648,7 +622,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                     builder: (context) => AttendanceDetailScreen(
                       classCode: widget.joinCode,
                       classId: widget.classId,
-                      sessionId: data['id'] ?? '', // Session ID
+                      sessionId: data['attendanceId']?.toString() ?? '', // Session ID
                       date: date,
                       attendeeUids: attendeeUids,
                       isTeacher: isTeacher,
@@ -826,38 +800,65 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     final titleController = TextEditingController();
     final contentController = TextEditingController();
 
+    final formKey = GlobalKey<FormState>();
+
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Yeni Duyuru"),
         content: SizedBox(
           width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(labelText: "Başlık"),
-              ),
-              TextField(
-                controller: contentController,
-                decoration: const InputDecoration(labelText: "İçerik"),
-                maxLines: 3,
-              ),
-            ],
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: titleController,
+                  maxLength: 50,
+                  decoration: const InputDecoration(labelText: "Başlık", counterText: ""),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Başlık gerekli';
+                    if (val.length > 50) return 'Maksimum 50 karakter';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: contentController,
+                  decoration: const InputDecoration(labelText: "İçerik"),
+                  maxLines: 3,
+                  validator: (val) {
+                     if (val == null || val.trim().isEmpty) return 'İçerik gerekli';
+                     return null;
+                  },
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("İptal")),
           ElevatedButton(
             onPressed: () async {
-              if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
-                await ref.read(announcementServiceProvider).createAnnouncement(
-                  widget.classId,
-                  titleController.text,
-                  contentController.text,
-                );
-                if (context.mounted) Navigator.pop(context);
+              if (formKey.currentState!.validate()) {
+                try {
+                  await ref.read(announcementServiceProvider).createAnnouncement(
+                    widget.classId,
+                    titleController.text.trim(),
+                    contentController.text.trim(),
+                  );
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ref.invalidate(classAnnouncementsProvider(widget.classId));
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Hata: $e')),
+                    );
+                  }
+                }
               }
             },
             child: const Text("Paylaş"),
@@ -876,7 +877,16 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         confirmText: "Evet",
         cancelText: "Hayır",
         onConfirm: () async {
-          await ref.read(announcementServiceProvider).deleteAnnouncement(announcementId);
+          try {
+            await ref.read(announcementServiceProvider).deleteAnnouncement(announcementId);
+            ref.invalidate(classAnnouncementsProvider(widget.classId));
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Silme hatası: $e')),
+              );
+            }
+          }
         },
       ),
     );

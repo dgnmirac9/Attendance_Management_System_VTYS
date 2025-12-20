@@ -16,12 +16,14 @@ router = APIRouter()
 
 
 # Response schemas
-class StudentProfileResponse(BaseModel):
+from app.schemas.base import CamelCaseModel
+
+class StudentProfileResponse(CamelCaseModel):
     """Student profile response"""
     student_id: int
     user_id: int
     student_number: str
-    department: str
+    # Removed: department
     full_name: str
     email: str
     face_registered: bool
@@ -30,12 +32,12 @@ class StudentProfileResponse(BaseModel):
         from_attributes = True
 
 
-class StudentUpdateRequest(BaseModel):
+class StudentUpdateRequest(CamelCaseModel):
     """Student profile update request"""
     full_name: str | None = Field(None, description="Full name")
     email: str | None = Field(None, description="Email address")
     password: str | None = Field(None, min_length=8, description="New password")
-    department: str | None = Field(None, description="Department")
+    # Removed: department
 
 
 @router.get(
@@ -45,10 +47,6 @@ class StudentUpdateRequest(BaseModel):
     dependencies=[Depends(get_current_user_sync)],
     description="""
     Get the profile of the currently authenticated student.
-    
-    **Requirements:**
-    - User must be authenticated
-    - User must have student role
     
     **Returns:**
     - Student profile with user information
@@ -60,13 +58,12 @@ class StudentUpdateRequest(BaseModel):
             "content": {
                 "application/json": {
                     "example": {
-                        "student_id": 1,
-                        "user_id": 1,
-                        "student_number": "2024001",
-                        "department": "Computer Science",
-                        "full_name": "John Doe",
+                        "studentId": 1,
+                        "userId": 1,
+                        "studentNumber": "2024001",
+                        "fullName": "John Doe",
                         "email": "john@example.com",
-                        "face_registered": True
+                        "faceRegistered": True
                     }
                 }
             }
@@ -101,13 +98,13 @@ def get_my_profile(
         )
     
     return {
-        "student_id": student.student_id,
-        "user_id": student.user_id,
-        "student_number": student.student_number,
-        "department": student.department,
-        "full_name": current_user.full_name,
+        "studentId": student.student_id,
+        "userId": student.user_id,
+        "studentNumber": student.student_number,
+        # Removed: department
+        "fullName": current_user.full_name,
         "email": current_user.email,
-        "face_registered": student.face_data_url is not None
+        "faceRegistered": student.face_data_url is not None
     }
 
 
@@ -117,16 +114,6 @@ def get_my_profile(
     summary="Update current student profile",
     description="""
     Update the profile of the currently authenticated student.
-    
-    **Requirements:**
-    - User must be authenticated
-    - User must have student role
-    
-    **Updatable Fields:**
-    - Full name
-    - Email (must be unique)
-    - Password
-    - Department
     
     **Returns:**
     - Updated student profile
@@ -162,8 +149,8 @@ def update_my_profile(
         update_data = UserUpdate(
             full_name=request.full_name,
             email=request.email,
-            password=request.password,
-            department=request.department
+            password=request.password
+            # Removed: department
         )
         
         # Update user
@@ -173,13 +160,13 @@ def update_my_profile(
         student = user_service.get_student_profile_sync(db, updated_user.user_id)
         
         return {
-            "student_id": student.student_id,
-            "user_id": student.user_id,
-            "student_number": student.student_number,
-            "department": student.department,
-            "full_name": updated_user.full_name,
+            "studentId": student.student_id,
+            "userId": student.user_id,
+            "studentNumber": student.student_number,
+            # Removed: department
+            "fullName": updated_user.full_name,
             "email": updated_user.email,
-            "face_registered": student.face_data_url is not None
+            "faceRegistered": student.face_data_url is not None
         }
         
     except AppException as e:
@@ -191,146 +178,4 @@ def update_my_profile(
         )
 
 
-@router.get(
-    "/me/courses",
-    summary="Get student's enrolled courses",
-    description="""
-    Get list of courses the student is enrolled in.
-    
-    **Requirements:**
-    - User must be authenticated
-    - User must have student role
-    
-    **Returns:**
-    - List of enrolled courses with details
-    """,
-    responses={
-        200: {
-            "description": "Courses retrieved successfully",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "courses": [
-                            {
-                                "course_id": 1,
-                                "course_name": "Introduction to Programming",
-                                "course_code": "CS101",
-                                "instructor_name": "Dr. Jane Smith",
-                                "semester": "Fall",
-                                "year": 2024,
-                                "credits": 3
-                            }
-                        ],
-                        "total": 1
-                    }
-                }
-            }
-        },
-        403: {
-            "description": "Forbidden - User is not a student"
-        }
-    }
-)
-def get_my_courses(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_sync)
-) -> Dict[str, Any]:
-    """Get student's enrolled courses"""
-    
-    # Check if user is a student
-    if current_user.role != "student":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only students can access this endpoint"
-        )
-    
-    # Get student profile
-    student = user_service.get_student_profile_sync(db, current_user.user_id)
-    if not student:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Student profile not found"
-        )
-    
-    try:
-        from app.services.course_service import course_service
-        
-        # Get enrolled courses
-        courses = course_service.list_student_courses_sync(db, student.student_id)
-        
-        # Format response
-        course_list = []
-        for course in courses:
-            course_list.append({
-                "course_id": course.course_id,
-                "course_name": course.course_name,
-                "course_code": course.course_code,
-                "instructor_name": course.instructor.user.full_name if course.instructor else "Unknown",
-                "semester": course.semester,
-                "year": course.year,
-                "credits": course.credits,
-                "is_active": course.is_active
-            })
-        
-        return {
-            "courses": course_list,
-            "total": len(course_list)
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get courses: {str(e)}"
-        )
 
-
-@router.get(
-    "/me/attendance-history",
-    summary="Get student's attendance history",
-    description="""
-    Get attendance history for the student across all courses.
-    
-    **Requirements:**
-    - User must be authenticated
-    - User must have student role
-    
-    **Returns:**
-    - List of attendance records
-    
-    **Note:** This endpoint will be fully implemented when Attendance service is ready.
-    """,
-    responses={
-        200: {
-            "description": "Attendance history retrieved successfully",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "message": "Attendance service not yet implemented",
-                        "attendance_records": []
-                    }
-                }
-            }
-        },
-        403: {
-            "description": "Forbidden - User is not a student"
-        }
-    }
-)
-def get_my_attendance_history(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_sync)
-) -> Dict[str, Any]:
-    """Get student's attendance history"""
-    
-    # Check if user is a student
-    if current_user.role != "student":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only students can access this endpoint"
-        )
-    
-    # TODO: Implement when attendance service is ready
-    return {
-        "message": "Attendance service not yet implemented",
-        "attendance_records": []
-    }

@@ -14,7 +14,7 @@ class FaceService {
         'image': await MultipartFile.fromFile(imagePath),
       });
 
-      final response = await _apiClient.dio.post('/face/verify', data: formData);
+      final response = await _apiClient.post('/face/verify', data: formData);
       
       return response.data['verified'] == true;
     } on DioException catch (e) {
@@ -25,4 +25,22 @@ class FaceService {
       throw e.response?.data['message'] ?? 'Yüz doğrulama servisinde hata oluştu.';
     }
   }
+
+  /// Registers/updates face data for the current user.
+  /// Returns [true] if registration is successful.
+  Future<bool> registerFace(String imagePath, {bool checkDuplicate = true}) async {
+    try {
+      FormData formData = FormData.fromMap({
+        'image': await MultipartFile.fromFile(imagePath),
+        'checkDuplicate': checkDuplicate.toString(),
+      });
+
+      final response = await _apiClient.post('/face/register', data: formData);
+      
+      return response.data['success'] == true || response.statusCode == 201;
+    } on DioException catch (e) {
+      throw e.response?.data['message'] ?? 'Yüz verisi kaydedilemedi.';
+    }
+  }
+
 }

@@ -8,7 +8,7 @@ try:
     from app.services.face_service import FaceService, face_service
     FACE_SERVICE_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️  Warning: Face service not available - {e}")
+    print(f"[WARN] Face service not available - {e}")
     print("   Install DeepFace to enable face recognition features")
     FaceService = None
     face_service = None

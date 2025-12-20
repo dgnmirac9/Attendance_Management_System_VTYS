@@ -19,13 +19,16 @@ class ClassModel {
 
   factory ClassModel.fromJson(Map<String, dynamic> json) {
     return ClassModel(
-      id: json['id']?.toString() ?? '',
-      className: json['class_name'] ?? '',
-      teacherId: json['teacher_id']?.toString() ?? '',
-      teacherName: json['teacher_name'] ?? '',
-      joinCode: json['join_code'] ?? '',
-      studentIds: (json['student_ids'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
+      id: json['id']?.toString() ?? json['courseId']?.toString() ?? json['course_id']?.toString() ?? '',
+      className: json['className'] ?? json['class_name'] ?? json['courseName'] ?? json['course_name'] ?? '',
+      teacherId: json['teacherId']?.toString() ?? json['teacher_id']?.toString() ?? json['instructorId']?.toString() ?? json['instructor_id']?.toString() ?? '',
+      teacherName: json['teacherName'] ?? json['teacher_name'] ?? '',
+      joinCode: json['joinCode'] ?? json['join_code'] ?? '',
+      studentIds: (json['studentIds'] as List?)?.map((e) => e.toString()).toList() 
+          ?? (json['student_ids'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      createdAt: json['createdAt'] != null 
+          ? DateTime.tryParse(json['createdAt']) 
+          : (json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null),
     );
   }
 
@@ -37,7 +40,7 @@ class ClassModel {
       'teacher_name': teacherName,
       'join_code': joinCode,
       'student_ids': studentIds,
-      // 'created_at': createdAt?.toIso8601String(),
+      'created_at': createdAt?.toIso8601String(),
     };
   }
 }

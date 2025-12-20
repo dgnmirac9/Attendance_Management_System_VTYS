@@ -15,6 +15,8 @@ class CreateClassDialog extends ConsumerStatefulWidget {
 class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _classNameController = TextEditingController();
+  String? _selectedSemester;
+  final List<String> _semesters = ['Güz', 'Bahar', 'Yaz'];
   bool _isLoading = false;
 
   @override
@@ -32,19 +34,9 @@ class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
       final user = ref.read(currentUserProvider);
       if (user == null) throw Exception("Kullanıcı oturumu bulunamadı");
 
-      // Fetch teacher's name from current user state
-      String teacherName = user.name;
-      if (teacherName.isEmpty) {
-        if (user.firstName != null && user.firstName!.isNotEmpty) {
-           teacherName = "${user.firstName} ${user.lastName ?? ''}".trim();
-        } else {
-           teacherName = user.email; // Fallback
-        }
-      }
-
       await ref.read(classroomControllerProvider.notifier).createClass(
-        className: _classNameController.text.trim(),
-        teacherName: teacherName,
+        courseName: _classNameController.text.trim(),
+        semester: _selectedSemester!,
       );
 
       if (mounted) {
@@ -89,6 +81,12 @@ class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Sınıf adı boş olamaz';
                     }
+                    if (value.trim().length < 3) {
+                      return 'Sınıf adı en az 3 karakter olmalıdır';
+                    }
+                    if (value.trim().length > 50) {
+                      return 'Sınıf adı 50 karakterden uzun olamaz';
+                    }
                     return null;
                   },
                   decoration: InputDecoration(
@@ -110,6 +108,31 @@ class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
                       borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedSemester,
+                  validator: (value) => value == null ? 'Dönem seçiniz' : null,
+                  onChanged: (value) => setState(() => _selectedSemester = value),
+                  decoration: InputDecoration(
+                    labelText: 'Dönem',
+                    prefixIcon: const Icon(Icons.calendar_month),
+                    filled: true,
+                    fillColor: theme.colorScheme.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: theme.dividerColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: theme.dividerColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+                    ),
+                  ),
+                  items: _semesters.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                 ),
                 const SizedBox(height: 24),
                 Row(

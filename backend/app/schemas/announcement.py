@@ -1,32 +1,19 @@
-"""Announcement schemas for request/response validation"""
-
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
+from app.schemas.base import CamelCaseModel
 
-
-class AnnouncementBase(BaseModel):
-    """Base announcement schema"""
-    type: str = Field(..., pattern="^(duyuru|not|kaynak)$")
-    title: str = Field(..., min_length=1, max_length=100)
+class AnnouncementBase(CamelCaseModel):
+    title: str
     content: Optional[str] = None
-    attachment_url: Optional[str] = Field(None, max_length=255)
-
+    type: str = "duyuru"
 
 class AnnouncementCreate(AnnouncementBase):
-    """Schema for creating an announcement"""
-    course_id: int = Field(..., gt=0)
+    class_id: int
 
-
-class AnnouncementUpdate(BaseModel):
-    """Schema for updating an announcement"""
-    title: Optional[str] = Field(None, min_length=1, max_length=100)
-    content: Optional[str] = None
-    attachment_url: Optional[str] = Field(None, max_length=255)
-
+class AnnouncementUpdate(AnnouncementBase):
+    pass
 
 class AnnouncementResponse(AnnouncementBase):
-    """Schema for announcement response"""
     announcement_id: int
     course_id: int
     instructor_id: int
@@ -34,17 +21,3 @@ class AnnouncementResponse(AnnouncementBase):
     
     class Config:
         from_attributes = True
-
-
-class AnnouncementDetailResponse(AnnouncementResponse):
-    """Schema for detailed announcement with instructor info"""
-    instructor_name: str
-    instructor_title: Optional[str] = None
-
-
-class CourseAnnouncementsResponse(BaseModel):
-    """Schema for list of course announcements"""
-    course_id: int
-    course_name: str
-    total_announcements: int
-    announcements: List[AnnouncementResponse]

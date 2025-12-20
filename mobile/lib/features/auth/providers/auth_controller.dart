@@ -27,12 +27,14 @@ class AuthController extends StateNotifier<AsyncValue<UserModel?>> {
   }
 
   Future<void> signIn({required String email, required String password}) async {
-    state = const AsyncValue.loading();
+    // Note: We don't set global loading here to prevent AuthWrapper from unmounting LoginScreen
+    // The UI should handle local loading state
     try {
       final user = await _authService.login(email, password);
       state = AsyncValue.data(user);
     } catch (e) {
-      state = AsyncValue.error(e, StackTrace.current);
+      // Revert to unauthenticated state on error, allow UI to handle the exception
+      state = const AsyncValue.data(null);
       rethrow;
     }
   }
@@ -46,9 +48,9 @@ class AuthController extends StateNotifier<AsyncValue<UserModel?>> {
     String? studentNo,
     String? faceImagePath,
   }) async {
-    state = const AsyncValue.loading();
+    // Note: We don't set global loading here to prevent AuthWrapper from unmounting RegisterScreen
     try {
-      await _authService.register(
+      final user = await _authService.register(
         email: email,
         password: password,
         role: role,
@@ -57,10 +59,11 @@ class AuthController extends StateNotifier<AsyncValue<UserModel?>> {
         studentNo: studentNo,
         faceImagePath: faceImagePath,
       );
-      // Auto login after register
-      await signIn(email: email, password: password);
+      // Auto login handling (token is already saved in register)
+      state = AsyncValue.data(user);
     } catch (e) {
-      state = AsyncValue.error(e, StackTrace.current);
+      // Revert to unauthenticated state on error, allow UI to handle the exception
+      state = const AsyncValue.data(null);
       rethrow;
     }
   }
@@ -71,7 +74,9 @@ class AuthController extends StateNotifier<AsyncValue<UserModel?>> {
       await _authService.logout();
       state = const AsyncValue.data(null);
     } catch (e) {
-      state = AsyncValue.error(e, StackTrace.current);
+      // Even if logout fails (e.g. network), we should probably clear local state locally
+      // For now, allow UI to decide, but force null state to "logout" locally
+      state = const AsyncValue.data(null); 
     }
   }
 

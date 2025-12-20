@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from deepface import DeepFace
+
 from app.config import settings
 from app.core.encryption import encryption_service
 from app.core.exceptions import AppException
@@ -83,6 +83,7 @@ class FaceService:
             image_array = self._base64_to_image(image_base64)
             
             # Extract face embedding using DeepFace
+            from deepface import DeepFace
             embedding_objs = DeepFace.represent(
                 img_path=image_array,
                 model_name=self.model_name,

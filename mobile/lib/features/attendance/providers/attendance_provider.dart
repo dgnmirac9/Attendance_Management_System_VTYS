@@ -34,9 +34,9 @@ class AttendanceController extends AsyncNotifier<void> {
     state = const AsyncValue.loading();
     try {
       // API call to start session
-      await ref.read(attendanceServiceProvider).startAttendance(classId);
+      final sessionId = await ref.read(attendanceServiceProvider).startAttendance(classId);
       state = const AsyncValue.data(null);
-      return "session_id_placeholder"; // API should return ID
+      return sessionId;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       rethrow;
@@ -63,7 +63,11 @@ class AttendanceController extends AsyncNotifier<void> {
     state = const AsyncValue.loading();
     try {
       // Directly send file to API
-      await ref.read(attendanceServiceProvider).joinAttendance(sessionId, photo.path);
+      await ref.read(attendanceServiceProvider).joinAttendance(
+        sessionId, 
+        photo.path,
+        scannedCode: scannedCode,
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

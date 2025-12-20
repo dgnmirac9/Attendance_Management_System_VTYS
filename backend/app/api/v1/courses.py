@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from typing import Dict, Any, List, Optional
 
 from app.api.deps import get_db, get_current_user_sync
@@ -141,6 +142,84 @@ def create_course(
 
 
 @router.get(
+    "/",
+    response_model=List[Dict[str, Any]],
+    summary="Get user's courses"
+)
+def get_courses(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_sync)
+) -> List[Dict[str, Any]]:
+    """Get courses for current user"""
+    from app.models.course import Course
+    
+    try:
+        courses = []
+        
+        if current_user.role == "instructor":
+            instructor = user_service.get_instructor_profile_sync(db, current_user.user_id)
+            if not instructor:
+                return []
+            # Direct database query for instructor courses (only active)
+            courses = db.query(Course).filter(
+                and_(
+                    Course.instructor_id == instructor.instructor_id,
+                    Course.is_active == True  # Only show active courses
+                )
+            ).all()
+            
+        elif current_user.role == "student":
+            student = user_service.get_student_profile_sync(db, current_user.user_id)
+            if not student:
+                return []
+            # Join with enrollments to get student courses (only active)
+            from app.models.enrollment import Enrollment
+            courses = db.query(Course).join(
+                Enrollment, Course.course_id == Enrollment.course_id
+            ).filter(
+                and_(
+                    Enrollment.student_id == student.student_id,
+                    Course.is_active == True  # Only show active courses
+                )
+            ).all()
+        else:
+            return []
+        
+        result = []
+        for course in courses:
+            # Get instructor name and user_id
+            teacher_name = ""
+            teacher_user_id = None
+            if course.instructor_id:
+                instructor_user = db.query(User).join(
+                    Instructor, User.user_id == Instructor.user_id
+                ).filter(
+                    Instructor.instructor_id == course.instructor_id
+                ).first()
+                if instructor_user:
+                    teacher_name = instructor_user.full_name
+                    teacher_user_id = instructor_user.user_id
+            
+            result.append({
+                "id": course.course_id,
+                "className": course.course_name,
+                "teacherId": course.instructor_id,
+                "teacherName": teacher_name,  # ADDED
+                "joinCode": course.join_code,
+                "studentIds": [],
+                "createdAt": course.created_at.isoformat() if course.created_at else None
+            })
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get courses: {str(e)}"
+        )
+
+
+@router.get(
     "/{course_id}",
     response_model=CourseResponse,
     summary="Get course details",
@@ -200,12 +279,28 @@ def get_course(
             detail="You don't have access to this course"
         )
     
-    return {
+    # Get teacher name and user_id
+    teacher_name = ""
+    teacher_user_id = None
+    if course.instructor_id:
+        instructor_user = db.query(User).join(
+            Instructor, User.user_id == Instructor.user_id
+        ).filter(
+            Instructor.instructor_id == course.instructor_id
+        ).first()
+        if instructor_user:
+            teacher_name = instructor_user.full_name
+            teacher_user_id = instructor_user.user_id
+    
+    
+    response_data = {
         "course_id": course.course_id,
         "course_name": course.course_name,
         "course_code": course.course_code,
         "description": course.description,
         "instructor_id": course.instructor_id,
+        "teacher_id": teacher_user_id, # Return User ID
+        "teacher_name": teacher_name,
         "join_code": course.join_code if current_user.role == "instructor" else None,
         "semester": course.semester,
         "year": course.year,
@@ -214,6 +309,9 @@ def get_course(
         "is_active": course.is_active,
         "created_at": course.created_at.isoformat()
     }
+    
+    print(f"DEBUG: GET /courses/{course_id} response:", response_data)
+    return response_data
 
 
 @router.post(

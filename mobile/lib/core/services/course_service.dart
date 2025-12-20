@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../network/api_client.dart';
 import '../../features/classroom/models/class_model.dart'; 
 import '../../features/auth/models/user_model.dart';
+import '../utils/error_handler.dart';
 
 final courseServiceProvider = Provider((ref) => CourseService());
 
@@ -13,7 +14,7 @@ class CourseService {
 
   Future<List<ClassModel>> getCourses() async {
     try {
-      final response = await _apiClient.dio.get('/courses');
+      final response = await _apiClient.get('/courses');
       return (response.data as List)
           .map((json) => ClassModel.fromJson(json))
           .toList();
@@ -22,20 +23,20 @@ class CourseService {
     }
   }
 
-  Future<void> createCourse(String name, String code) async {
+  Future<void> createCourse(String courseName, String semester) async {
     try {
-      await _apiClient.dio.post('/courses', data: {
-        'class_name': name,
-        'class_code': code, 
+      await _apiClient.post('/courses/', data: {
+        'course_name': courseName,
+        'semester': semester,
       });
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Ders oluşturulamadı.';
+      throw ErrorHandler.fromDioError(e);
     }
   }
 
   Future<void> joinCourse(String joinCode) async {
     try {
-      await _apiClient.dio.post('/courses/join', data: {
+      await _apiClient.post('/courses/join', data: {
         'join_code': joinCode,
       });
     } on DioException catch (e) {
@@ -45,7 +46,7 @@ class CourseService {
 
   Future<ClassModel> getCourseDetails(String courseId) async {
     try {
-      final response = await _apiClient.dio.get('/courses/$courseId');
+      final response = await _apiClient.get('/courses/$courseId');
       return ClassModel.fromJson(response.data);
     } on DioException catch (e) {
        throw e.response?.data['message'] ?? 'Ders detayları alınamadı.';
@@ -54,8 +55,8 @@ class CourseService {
 
   Future<void> updateCourseName(String courseId, String newName) async {
     try {
-      await _apiClient.dio.put('/courses/$courseId', data: {
-        'class_name': newName,
+      await _apiClient.put('/courses/$courseId', data: {
+        'course_name': newName,
       });
     } on DioException catch (e) {
       throw e.response?.data['message'] ?? 'Ders adı güncellenemedi.';
@@ -64,7 +65,7 @@ class CourseService {
 
   Future<void> deleteCourse(String courseId) async {
      try {
-      await _apiClient.dio.delete('/courses/$courseId');
+      await _apiClient.delete('/courses/$courseId');
     } on DioException catch (e) {
       throw e.response?.data['message'] ?? 'Ders silinemedi.';
     }
@@ -72,7 +73,7 @@ class CourseService {
 
   Future<void> leaveCourse(String courseId) async {
      try {
-      await _apiClient.dio.post('/courses/$courseId/leave');
+      await _apiClient.post('/courses/$courseId/leave');
     } on DioException catch (e) {
       throw e.response?.data['message'] ?? 'Dersten ayrılınamadı.';
     }
@@ -80,7 +81,7 @@ class CourseService {
 
   Future<List<UserModel>> getCourseStudents(String courseId) async {
     try {
-      final response = await _apiClient.dio.get('/courses/$courseId/students');
+      final response = await _apiClient.get('/courses/$courseId/students');
        return (response.data as List)
           .map((json) => UserModel.fromJson(json))
           .toList();
@@ -89,4 +90,5 @@ class CourseService {
     }
   }
 }
+
 

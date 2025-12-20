@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../errors/app_exception.dart';
 
 class SnackbarUtils {
   static const double _borderRadius = 12.0;
@@ -42,8 +43,15 @@ class SnackbarUtils {
   }
 
   // --- HATA (ERROR) ---
-  static void showError(BuildContext context, String message) {
+  static void showError(BuildContext context, dynamic error) {
     final theme = Theme.of(context);
+    String message;
+    if (error is AppException) {
+      message = error.message;
+    } else {
+      message = error.toString().replaceAll('Exception: ', '');
+    }
+
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(

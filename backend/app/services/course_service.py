@@ -3,6 +3,7 @@
 import string
 import random
 from typing import Optional, List
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -60,12 +61,12 @@ class CourseService:
             # Create course
             course = Course(
                 course_name=course_data.course_name,
-                course_code=course_data.course_code,
+                course_code=course_data.course_name[:3].upper() + str(random.randint(100, 999)) if len(course_data.course_name) >= 3 else "CSE" + str(random.randint(100, 999)),
                 description=course_data.description,
                 instructor_id=instructor_id,
                 join_code=join_code,
                 semester=course_data.semester,
-                year=course_data.year,
+                year=datetime.now().year,
                 credits=course_data.credits,
                 max_students=course_data.max_students,
                 is_active=True
@@ -115,12 +116,12 @@ class CourseService:
             # Create course
             course = Course(
                 course_name=course_data.course_name,
-                course_code=course_data.course_code,
+                course_code=course_data.course_name[:3].upper() + str(random.randint(100, 999)) if len(course_data.course_name) >= 3 else "CSE" + str(random.randint(100, 999)),
                 description=course_data.description,
                 instructor_id=instructor_id,
                 join_code=join_code,
                 semester=course_data.semester,
-                year=course_data.year,
+                year=datetime.now().year,
                 credits=course_data.credits,
                 max_students=course_data.max_students,
                 is_active=True
