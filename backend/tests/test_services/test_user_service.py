@@ -16,18 +16,14 @@ SAMPLE_STUDENT_DATA = UserCreate(
     password="Test123!",
     full_name="Test Student",
     role="student",
-    student_number="2024001",
-    department="Computer Science"
+    student_number="202400001"
 )
 
 SAMPLE_INSTRUCTOR_DATA = UserCreate(
     email="instructor@test.com",
     password="Test123!",
     full_name="Test Instructor",
-    role="instructor",
-    instructor_number="INS001",
-    department="Computer Science",
-    title="Professor"
+    role="instructor"
 )
 
 
@@ -198,8 +194,7 @@ class TestUserService:
         update_data = UserUpdate(
             full_name="New Name",
             email="new@test.com",
-            password="NewPass123!",
-            department="New Department"
+            password="NewPass123!"
         )
         
         result = service.update_user_sync(mock_db, 1, update_data)
