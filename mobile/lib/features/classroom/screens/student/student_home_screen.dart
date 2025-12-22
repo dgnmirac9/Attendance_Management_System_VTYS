@@ -5,6 +5,7 @@ import '../../../auth/providers/auth_controller.dart';
 import '../../providers/classroom_provider.dart';
 import 'join_class_dialog.dart';
 import 'student_class_detail_screen.dart';
+import '../../../auth/screens/student_profile_screen.dart';
 
 class StudentHomeScreen extends ConsumerWidget {
   const StudentHomeScreen({super.key});
@@ -28,6 +29,17 @@ class StudentHomeScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const StudentProfileScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {

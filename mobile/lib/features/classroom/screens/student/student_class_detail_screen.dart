@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:attendance_management_system_vtys/features/auth/services/user_service.dart';
+import 'package:attendance_management_system_vtys/features/auth/screens/student_profile_screen.dart';
 import 'package:attendance_management_system_vtys/features/attendance/providers/attendance_provider.dart';
 import 'package:attendance_management_system_vtys/features/attendance/screens/camera_screen.dart';
 import 'package:attendance_management_system_vtys/features/classroom/screens/documents_screen.dart';
@@ -84,6 +87,42 @@ class StudentClassDetailScreen extends ConsumerWidget {
                         FilledButton.icon(
                           onPressed: !hasAttended && !isLoading
                               ? () async {
+                                  // GUARD CLAUSE: Check for face registration
+                                  final user = FirebaseAuth.instance.currentUser;
+                                  if (user != null) {
+                                    final userDetails = await UserService().getUserDetails(user.uid);
+                                    if (userDetails?.faceEmbedding == null || userDetails!.faceEmbedding!.isEmpty) {
+                                      if (context.mounted) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text('Yüz Kaydı Bulunamadı'),
+                                            content: const Text('Yoklamaya katılmak için önce profil sayfasından yüzünüzü tanıtmalısınız.'),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(context),
+                                                child: const Text('İptal'),
+                                              ),
+                                              FilledButton(
+                                                onPressed: () {
+                                                  Navigator.pop(context); // Close dialog
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) => const StudentProfileScreen(),
+                                                    ),
+                                                  );
+                                                },
+                                                child: const Text('Profile Git'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                      return;
+                                    }
+                                  }
+
                                   final photoFile = await Navigator.push<File>(
                                     context,
                                     MaterialPageRoute(

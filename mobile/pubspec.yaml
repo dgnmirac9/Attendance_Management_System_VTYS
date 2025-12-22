@@ -15,9 +15,10 @@ dependencies:
     sdk: flutter
 
   # Yüz embedding modeli için
-  tflite_flutter: ^0.10.0
+  tflite_flutter: ^0.11.0
   # Görüntü işleme (resize / normalize vs.)
   image: ^4.1.7
+  flutter_image_compress: ^2.3.0
   # Kamera erişimif
   camera: ^0.10.5+9
   # Google MLKit yüz algılama
@@ -57,6 +58,9 @@ dev_dependencies:
 
   flutter_lints: ^5.0.0
 
-# The following section is specific to Flutter packages.
+  # The following section is specific to Flutter packages.
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/models/mobilefacenet.tflite

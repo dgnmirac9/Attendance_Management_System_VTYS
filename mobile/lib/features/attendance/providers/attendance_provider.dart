@@ -1,9 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../services/attendance_service.dart';
+
+import '../../auth/services/user_service.dart';
+
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import '../services/face_recognition_service.dart';
 import '../../auth/providers/auth_controller.dart';
 
 final attendanceServiceProvider = Provider<AttendanceService>((ref) {
@@ -85,7 +91,37 @@ class AttendanceController extends AsyncNotifier<void> {
       final user = ref.read(authStateChangesProvider).value;
       if (user == null) throw Exception("Kullanıcı oturumu açık değil");
 
-      // 1. Upload Photo
+      // 1. Get User's Registered Face Embedding
+      final userService = UserService();
+      final registeredEmbedding = await userService.getFaceEmbedding(user.uid);
+
+      if (registeredEmbedding == null) {
+        throw Exception("Lütfen önce profil sayfasından yüzünüzü tanıtın!");
+      }
+
+      // 2. Detect Face
+      final inputImage = InputImage.fromFile(photo);
+      final faceDetector = FaceDetector(options: FaceDetectorOptions());
+      final faces = await faceDetector.processImage(inputImage);
+      await faceDetector.close();
+
+      if (faces.isEmpty) {
+        throw Exception("Fotoğrafta yüz bulunamadı! Lütfen yüzünüzü net bir şekilde gösterin.");
+      }
+
+      // 3. Generate Embedding
+      final currentEmbedding = await FaceRecognitionService.instance.generateEmbedding(photo, faces.first);
+
+      // 4. Compare Embeddings (Euclidean Distance)
+      double distance = FaceRecognitionService.instance.calculateDistance(registeredEmbedding, currentEmbedding);
+      debugPrint("Face Distance: $distance");
+
+      // Threshold updated to 0.75 as requested
+      if (distance > 0.75) {
+        throw Exception("Yüz eşleşmedi! Lütfen kendiniz deneyin. (Mesafe: ${distance.toStringAsFixed(2)})");
+      }
+
+      // 5. Upload Photo
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('attendance_proofs/$classId/$sessionId/${user.uid}.jpg');
@@ -93,7 +129,7 @@ class AttendanceController extends AsyncNotifier<void> {
       await storageRef.putFile(photo);
       final photoUrl = await storageRef.getDownloadURL();
 
-      // 2. Save Record
+      // 6. Save Record
       await FirebaseFirestore.instance
           .collection('classes')
           .doc(classId)
@@ -106,6 +142,7 @@ class AttendanceController extends AsyncNotifier<void> {
         'timestamp': FieldValue.serverTimestamp(),
         'photoUrl': photoUrl,
         'status': 'present',
+        'faceDistance': distance,
       });
 
       state = const AsyncValue.data(null);
@@ -114,6 +151,8 @@ class AttendanceController extends AsyncNotifier<void> {
       rethrow;
     }
   }
+
+
 }
 
 final attendanceControllerProvider = AsyncNotifierProvider<AttendanceController, void>(() {

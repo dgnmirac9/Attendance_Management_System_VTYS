@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+
+
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -57,37 +58,22 @@ class _CameraScreenState extends State<CameraScreen> {
       final image = await _controller!.takePicture();
       final file = File(image.path);
 
-      // Face Detection
-      final inputImage = InputImage.fromFile(file);
-      final faceDetector = FaceDetector(
-        options: FaceDetectorOptions(
-          enableContours: false,
-          enableClassification: false,
-        ),
-      );
-
-      final faces = await faceDetector.processImage(inputImage);
-      await faceDetector.close();
-
-      if (faces.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Yüz bulunamadı! Lütfen yüzünüzü net bir şekilde gösterin.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          Navigator.of(context).pop(file);
-        }
+      // Return the file directly
+      if (mounted) {
+        Navigator.of(context).pop(file);
       }
     } catch (e) {
-      debugPrint('Error taking picture: $e');
+      debugPrint('Error processing image: $e');
       if (mounted) {
+        String errorMessage = 'Hata oluştu: $e';
+        if (e.toString().contains('No face detected')) {
+          errorMessage = 'Yüz bulunamadı! Lütfen yüzünüzü net bir şekilde gösterin.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
