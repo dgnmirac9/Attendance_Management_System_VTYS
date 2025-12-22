@@ -194,12 +194,17 @@ async def register(
                     image_base64 = base64.b64encode(contents).decode('utf-8')
                     
                     # Register Face (Sync)
-                    face_service.register_face_sync(
+                    encrypted_face_data = face_service.register_face_sync(
                         db=db,
                         student_id=student.student_id,
                         image_base64=image_base64,
                         check_duplicate=True
                     )
+                    
+                    student.face_data_url = encrypted_face_data
+                    db.add(student) # Update student record
+                    db.flush()
+                    
                     print(f"Face registered for student {student.student_id}")
                     
                 except Exception as e:
@@ -233,7 +238,8 @@ async def register(
             email=user.email,
             full_name=user.full_name,
             role=user.role,
-            created_at=user.created_at
+            created_at=user.created_at,
+            student_number=user_data.student_number if user.role == "student" else None
         )
         
         return TokenResponse(
@@ -243,6 +249,9 @@ async def register(
         )
     
     except IntegrityError as e:
+
+
+
         db.rollback()
         if "student_number" in str(e.orig):
             raise AppException("Student number already exists", status_code=409)
@@ -504,12 +513,26 @@ async def get_me(
     current_user: User = Depends(get_current_user_sync)
 ):
     """Get current authenticated user profile"""
+    student_num = None
+    if current_user.role == "student":
+        try:
+             # Try to access student relation. If it fails due to DetachedInstanceError, 
+             # we might need to query. But standard Depends(get_db) usually keeps session alive 
+             # if get_current_user_sync is implemented correctly.
+             # If it turns out to be None, we can't do much without a db session here.
+             # But let's assume it works for now as observed in other endpoints.
+             if current_user.student:
+                 student_num = current_user.student.student_number
+        except Exception:
+             pass
+
     return UserResponse(
         user_id=current_user.user_id,
         email=current_user.email,
         full_name=current_user.full_name,
         role=current_user.role,
-        created_at=current_user.created_at
+        created_at=current_user.created_at,
+        student_number=student_num
     )
 
 

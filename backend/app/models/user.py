@@ -1,6 +1,6 @@
 """User models: User, Student, Instructor"""
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, CheckConstraint
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, CheckConstraint, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -60,7 +60,7 @@ class Student(Base):
     )
     student_number = Column(String(20), unique=True, nullable=False, index=True)
     # Removed: department, class_level, enrollment_year
-    face_data_url = Column(String(255), nullable=True)
+    face_data_url = Column(Text, nullable=True)
     profile_image_url = Column(String(255), nullable=True)
     total_absences = Column(Integer, default=0)
     

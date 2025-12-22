@@ -24,7 +24,8 @@ def get_users_bulk(
         # Convert strings to ints if necessary
         ids = [int(uid) for uid in request.user_ids if uid.isdigit()]
         
-        users = db.query(User).filter(User.user_id.in_(ids)).all()
+        from sqlalchemy.orm import joinedload
+        users = db.query(User).options(joinedload(User.student)).filter(User.user_id.in_(ids)).all()
         
         return [
             UserResponse(
@@ -32,7 +33,8 @@ def get_users_bulk(
                 email=user.email,
                 full_name=user.full_name,
                 role=user.role,
-                created_at=user.created_at
+                created_at=user.created_at,
+                student_number=user.student.student_number if user.student else None
             ) for user in users
         ]
     except Exception as e:

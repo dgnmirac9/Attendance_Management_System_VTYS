@@ -50,6 +50,10 @@ class FaceService:
             # Convert to PIL Image
             image = Image.open(io.BytesIO(image_bytes))
             
+            # Apply EXIF rotation if present
+            from PIL import ImageOps
+            image = ImageOps.exif_transpose(image)
+            
             # Convert to RGB if necessary
             if image.mode != 'RGB':
                 image = image.convert('RGB')

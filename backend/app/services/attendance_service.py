@@ -270,13 +270,33 @@ class AttendanceService:
             raise DuplicateAttendanceError("Attendance already recorded for this student")
         
         # Yüz doğrulama yap
+        # Yüz doğrulama yap
         try:
-            verification_result = self.face_service.verify_face(student_id, face_image_data)
+            # 1. Öğrencinin yüz verisini al
+            student = self.db.query(Student).filter(Student.student_id == student_id).first()
+            if not student or not student.face_data_url:
+                 raise FaceVerificationError("Student face data not found. Please register your face first.")
+
+            # 2. Yüz verisini şifresini çöz
+            stored_embedding = self.face_service.decrypt_face_embedding(student.face_data_url)
             
-            if not verification_result["is_verified"]:
+            # 3. Gelen resmi Base64'e çevir
+            import base64
+            image_base64 = base64.b64encode(face_image_data).decode('utf-8')
+            
+            # 4. Karşılaştır
+            is_match, similarity = self.face_service.verify_face(
+                image_base64=image_base64,
+                stored_embedding=stored_embedding
+            )
+            
+            if not is_match:
                 raise FaceVerificationError(
-                    f"Face verification failed. Similarity: {verification_result['similarity']:.3f}"
+                    f"Face verification failed. Similarity: {similarity:.3f}"
                 )
+            
+            # data for return
+            verification_result = {"is_verified": is_match, "similarity": similarity}
             
             # Yoklama kaydı oluştur
             attendance_record = AttendanceRecord(

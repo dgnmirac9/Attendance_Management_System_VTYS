@@ -243,8 +243,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         const SizedBox(height: 16),
                         OutlinedButton.icon(
                           onPressed: _captureFaceData, 
-                          icon: const Icon(Icons.face),
-                          label: const Text('Yüz Verisi Ekle'), 
+                          icon: Icon(_faceImagePath != null ? Icons.check_circle : Icons.face),
+                          label: Text(_faceImagePath != null ? 'Yüz Verisi Alındı (Güncelle)' : 'Yüz Verisi Ekle'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _faceImagePath != null ? Colors.green : null,
+                            side: _faceImagePath != null ? const BorderSide(color: Colors.green) : null,
+                          ),
                         ),
                       ],
 

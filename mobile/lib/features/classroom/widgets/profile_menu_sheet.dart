@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../auth/providers/auth_controller.dart';
 import '../../auth/screens/edit_profile_screen.dart';
-import '../../auth/screens/face_capture_screen.dart';
+
 
 import '../../../../core/theme/app_theme.dart';
 
@@ -106,21 +106,7 @@ class ProfileMenuSheet extends ConsumerWidget {
               },
             ),
 
-            if (!isTeacher) ...[
-              const SizedBox(height: 16),
-              _buildMenuOption(
-                context: context,
-                icon: Icons.face_retouching_natural,
-                title: 'Yüz Verisini Güncelle',
-                backgroundColor: menuButtonColor,
-                iconColor: primaryColor,
-                textColor: primaryColor,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FaceCaptureScreen()));
-                },
-              ),
-            ],
+
 
             const SizedBox(height: 16),
 

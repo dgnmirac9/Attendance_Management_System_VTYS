@@ -228,8 +228,8 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
                               itemCount: records.length,
                               itemBuilder: (context, index) {
                                 final record = records[index];
-                                final name = record['name'] ?? record['studentId'] ?? "Öğrenci";
-                                final studentId = record['studentId'] ?? "";
+                                final name = record['student_name'] ?? record['name'] ?? "Öğrenci";
+                                final studentId = record['student_number'] ?? record['student_id']?.toString() ?? "";
                                 
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),

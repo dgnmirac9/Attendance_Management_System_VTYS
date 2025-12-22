@@ -58,6 +58,7 @@ class UserResponse(UserBase):
     user_id: int
     role: str
     created_at: datetime
+    student_number: Optional[str] = None
     
     class Config:
         from_attributes = True

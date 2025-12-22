@@ -439,64 +439,74 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
   Widget _buildAnnouncementsTab(BuildContext context, bool isTeacher) {
     final announcementsAsync = ref.watch(classAnnouncementsProvider(widget.classId));
 
-    return announcementsAsync.when(
-      data: (announcements) {
-        if (announcements.isEmpty) {
-          return const EmptyStateWidget(
-            icon: Icons.campaign_outlined,
-            message: "Henüz duyuru paylaşılmamış.",
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: announcements.length,
-          itemBuilder: (context, index) {
-            final data = announcements[index];
-            // Handle date parsing from API string or null
-            DateTime date = DateTime.now();
-            if (data['createdAt'] != null) {
-              date = DateTime.tryParse(data['createdAt']) ?? DateTime.now();
-            }
-            final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(date);
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            data['title'] ?? 'Başlıksız',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                          ),
-                        ),
-                        if (isTeacher)
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            onPressed: () => _deleteAnnouncement(context, data['id']?.toString() ?? ''),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(data['content'] ?? '', style: const TextStyle(fontSize: 15)),
-                    const SizedBox(height: 12),
-                    Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        return ref.refresh(classAnnouncementsProvider(widget.classId).future);
       },
-      loading: () => const SkeletonListWidget(itemCount: 3),
-      error: (e, s) => Center(child: Text('Hata: $e')),
+      child: announcementsAsync.when(
+        data: (announcements) {
+          if (announcements.isEmpty) {
+            return Stack(
+              children: [
+                const EmptyStateWidget(
+                  icon: Icons.campaign_outlined,
+                  message: "Henüz duyuru paylaşılmamış.",
+                ),
+                ListView(), // Empty ListView to allow pull-to-refresh on empty state
+              ],
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: announcements.length,
+            itemBuilder: (context, index) {
+              final data = announcements[index];
+              // Handle date parsing from API string or null
+              DateTime date = DateTime.now();
+              if (data['createdAt'] != null) {
+                date = DateTime.tryParse(data['createdAt']) ?? DateTime.now();
+              }
+              final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(date);
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              data['title'] ?? 'Başlıksız',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                            ),
+                          ),
+                          if (isTeacher)
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () => _deleteAnnouncement(context, data['id']?.toString() ?? ''),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(data['content'] ?? '', style: const TextStyle(fontSize: 15)),
+                      const SizedBox(height: 12),
+                      Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+        loading: () => const SkeletonListWidget(itemCount: 3),
+        error: (e, s) => Center(child: Text('Hata: $e')),
+      ),
     );
   }
 
@@ -505,83 +515,97 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     final studentsAsync = ref.watch(classStudentsProvider(widget.classId));
     final theme = Theme.of(context);
 
-    return studentsAsync.when(
-      data: (students) {
-        if (students.isEmpty) {
-          return const EmptyStateWidget(
-            icon: Icons.people_outline,
-            message: "Henüz kayıtlı öğrenci yok.",
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: students.length,
-          itemBuilder: (context, index) {
-            final student = students[index];
-            final name = student.name;
-            final studentInfo = student.studentNo ?? student.email;
+    return RefreshIndicator(
+      onRefresh: () async {
+         // Refresh both students and class details
+         await Future.wait([
+           ref.refresh(classDetailsProvider(widget.classId).future),
+           ref.refresh(classStudentsProvider(widget.classId).future),
+         ]);
+      },
+      child: studentsAsync.when(
+        data: (students) {
+          if (students.isEmpty) {
+            return Stack(
+              children: [
+                const EmptyStateWidget(
+                  icon: Icons.people_outline,
+                  message: "Henüz kayıtlı öğrenci yok.",
+                ),
+                ListView(),
+              ],
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: students.length,
+            itemBuilder: (context, index) {
+              final student = students[index];
+              final name = student.name;
+              final studentInfo = student.studentNo ?? student.email;
 
-            return Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: isTeacher ? () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => StudentDetailDialog(studentData: student),
-                  );
-                } : null,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      // Avatar
-                      CircleAvatar(
-                        backgroundColor: theme.colorScheme.primaryContainer,
-                        child: Text(
-                          name.isNotEmpty ? name[0].toUpperCase() : '?',
-                          style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: isTeacher ? () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => StudentDetailDialog(studentData: student),
+                    );
+                  } : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        // Avatar
+                        CircleAvatar(
+                          backgroundColor: theme.colorScheme.primaryContainer,
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : '?',
+                            style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      
-                      // Info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            if (studentInfo.toString().isNotEmpty)
+                        const SizedBox(width: 16),
+                        
+                        // Info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                studentInfo,
-                                style: TextStyle(color: theme.textTheme.bodyMedium?.color, fontSize: 13),
+                                name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: theme.colorScheme.primary,
+                                ),
                               ),
-                          ],
+                              if (studentInfo.toString().isNotEmpty)
+                                Text(
+                                  studentInfo,
+                                  style: TextStyle(color: theme.textTheme.bodyMedium?.color, fontSize: 13),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      
-                      // Info Icon (Teacher only)
-                      if (isTeacher)
-                        const Icon(Icons.info_outline, color: Colors.grey),
-                    ],
+                        
+                        // Info Icon (Teacher only)
+                        if (isTeacher)
+                          const Icon(Icons.info_outline, color: Colors.grey),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-      loading: () => const SkeletonListWidget(itemCount: 5),
-      error: (e, s) => Center(child: Text('Hata: $e')),
+              );
+            },
+          );
+        },
+        loading: () => const SkeletonListWidget(itemCount: 5),
+        error: (e, s) => Center(child: Text('Hata: $e')),
+      ),
     );
   }
 
@@ -589,55 +613,65 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
   Widget _buildHistoryTab(BuildContext context, bool isTeacher) {
     final historyAsync = ref.watch(classHistoryProvider(widget.classId));
 
-    return historyAsync.when(
-      data: (sessions) {
-        if (sessions.isEmpty) {
-          return const EmptyStateWidget(
-            icon: Icons.history,
-            message: "Henüz yoklama geçmişi yok.",
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: sessions.length,
-          itemBuilder: (context, index) {
-            final data = sessions[index]; // Map
-            
-            DateTime date = DateTime.now();
-            if (data['startTime'] != null) {
-               date = DateTime.tryParse(data['startTime']) ?? DateTime.now();
-            }
-
-            final attendeeUids = (data['attendees'] as List? ?? []).map((e) => e.toString()).toList();
-            final int totalCount = data['attendeeCount'] ?? attendeeUids.length;
-            
-            return _buildAttendanceCard(
-              context: context,
-              isTeacher: isTeacher,
-              date: date,
-              attendeeCount: totalCount,
-              isPresent: attendeeUids.contains(_currentUid),
-              onTap: isTeacher ? () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AttendanceDetailScreen(
-                      classCode: widget.joinCode,
-                      classId: widget.classId,
-                      sessionId: data['attendanceId']?.toString() ?? '', // Session ID
-                      date: date,
-                      attendeeUids: attendeeUids,
-                      isTeacher: isTeacher,
-                    ),
-                  ),
-                );
-              } : null,
-            );
-          },
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        return ref.refresh(classHistoryProvider(widget.classId).future);
       },
-      loading: () => const SkeletonListWidget(itemCount: 4),
-      error: (e, s) => Center(child: Text('Hata: $e')),
+      child: historyAsync.when(
+        data: (sessions) {
+          if (sessions.isEmpty) {
+             return Stack(
+              children: [
+                const EmptyStateWidget(
+                  icon: Icons.history,
+                  message: "Henüz yoklama geçmişi yok.",
+                ),
+                ListView(),
+              ],
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: sessions.length,
+            itemBuilder: (context, index) {
+              final data = sessions[index]; // Map
+              
+              DateTime date = DateTime.now();
+              if (data['startTime'] != null) {
+                 date = DateTime.tryParse(data['startTime']) ?? DateTime.now();
+              }
+
+              final attendeeUids = (data['attendees'] as List? ?? []).map((e) => e.toString()).toList();
+              final int totalCount = data['attendeeCount'] ?? attendeeUids.length;
+              
+              return _buildAttendanceCard(
+                context: context,
+                isTeacher: isTeacher,
+                date: date,
+                attendeeCount: totalCount,
+                isPresent: attendeeUids.contains(_currentUid),
+                onTap: isTeacher ? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AttendanceDetailScreen(
+                        classCode: widget.joinCode,
+                        classId: widget.classId,
+                        sessionId: data['attendanceId']?.toString() ?? '', // Session ID
+                        date: date,
+                        attendeeUids: attendeeUids,
+                        isTeacher: isTeacher,
+                      ),
+                    ),
+                  );
+                } : null,
+              );
+            },
+          );
+        },
+        loading: () => const SkeletonListWidget(itemCount: 4),
+        error: (e, s) => Center(child: Text('Hata: $e')),
+      ),
     );
   }
 

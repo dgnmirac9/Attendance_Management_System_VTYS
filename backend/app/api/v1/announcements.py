@@ -37,6 +37,8 @@ def get_announcements(
         Announcement.course_id == class_id
     ).order_by(desc(Announcement.created_at)).all()
     
+    print(f"DEBUG: get_announcements class_id={class_id} count={len(announcements)}")
+    
     # Transform to match Mobile App expectations (Map<String, dynamic>)
     result = []
     for a in announcements:
@@ -49,6 +51,7 @@ def get_announcements(
             "teacherName": a.instructor.user.full_name if a.instructor and a.instructor.user else "Unknown"
         })
     
+    print(f"DEBUG: get_announcements returning: {result}")
     return result
 
 @router.post("", status_code=status.HTTP_201_CREATED)

@@ -46,7 +46,7 @@ class AttendanceService {
     try {
       final Map<String, dynamic> checkInData = {
         'attendance_id': int.parse(sessionId),
-        if (scannedCode != null) 'qr_code': scannedCode,
+        if (scannedCode != null) 'qr_token': scannedCode,
       };
 
       FormData formData = FormData.fromMap({
@@ -56,7 +56,8 @@ class AttendanceService {
 
       await _apiClient.post('/attendance/check-in', data: formData);
     } on DioException catch (e) {
-      throw e.response?.data['message'] ?? 'Yoklamaya katılınamadı.';
+      final msg = e.response?.data['detail'] ?? e.response?.data['message'] ?? 'Yoklamaya katılınamadı.';
+      throw msg;
     }
   }
 

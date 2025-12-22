@@ -13,21 +13,21 @@ final classDetailsProvider = FutureProvider.autoDispose.family<ClassModel, Strin
 });
 
 // 2. Announcements Future
-final classAnnouncementsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, classId) async {
+final classAnnouncementsProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, classId) async {
   final service = ref.watch(announcementServiceProvider);
   return service.getAnnouncements(classId);
 });
 
 // 3. Students Future (List of User Data)
 // Assuming CourseService has getStudents or similar. If not, we need to add it or use /courses/:id/students
-final classStudentsProvider = FutureProvider.family<List<UserModel>, String>((ref, classId) async {
+final classStudentsProvider = FutureProvider.autoDispose.family<List<UserModel>, String>((ref, classId) async {
   final service = ref.watch(courseServiceProvider);
   // Independent fetch, do not watch classDetails to avoid loops
   return service.getCourseStudents(classId);
 });
 
 // 4. History Future (Sessions)
-final classHistoryProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, classId) async {
+final classHistoryProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, classId) async {
   final service = ref.watch(attendanceServiceProvider);
   return service.getAttendanceHistory(classId);
 });
