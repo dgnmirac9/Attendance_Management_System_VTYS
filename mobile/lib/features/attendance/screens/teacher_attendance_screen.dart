@@ -29,42 +29,57 @@ class TeacherAttendanceScreen extends ConsumerStatefulWidget {
 class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScreen> {
   String _currentQrData = "Loading...";
   Timer? _qrTimer;
+  Timer? _pollingTimer;
   
-
   @override
   void initState() {
     super.initState();
-    // İlk QR kodunu üret ve timer başlat
-    _updateQrCode();
+    // İlk QR kodunu oluştur
+    _generateNewQrCode();
+    
+    // QR kodu güncelleme ve Polling için timer başlat
+    // 5 saniyede bir çalışacak
     _qrTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      _updateQrCode();
-      // Poll attendance list
-      ref.invalidate(sessionAttendanceProvider(widget.sessionId));
+      if (!mounted) return;
+      _generateNewQrCode();
+      _pollAttendanceList();
     });
   }
 
   @override
   void dispose() {
     _qrTimer?.cancel();
+    _pollingTimer?.cancel();
     super.dispose();
   }
 
-  void _updateQrCode() {
-    // Rastgele benzersiz bir kod üret
+  void _generateNewQrCode() {
+    if (!mounted) return;
+
     final random = Random();
     final newCode = "${widget.classId}-${DateTime.now().millisecondsSinceEpoch}-${random.nextInt(1000)}";
 
-    if (mounted) {
-      setState(() {
-        _currentQrData = newCode;
-      });
-    }
+    setState(() {
+      _currentQrData = newCode;
+    });
 
-    // Servis üzerinden API'yi güncelle
-    ref.read(attendanceServiceProvider).updateSessionQrCode(
-      widget.sessionId, 
-      newCode
-    );
+    // API'yi güncelle (Arka planda, await etmiyoruz ki UI donmasın)
+    // Hata olursa kullanıcıya yansıtmak yerine logluyoruz, çünkü bu sık yapılan bir işlem
+    try {
+      ref.read(attendanceServiceProvider).updateSessionQrCode(
+        widget.sessionId, 
+        newCode
+      );
+    } catch (e) {
+      debugPrint("QR Update Failed: $e");
+    }
+  }
+
+  void _pollAttendanceList() {
+    if (!mounted) return;
+    // Listeyi yenilemek için provider'ı invalidate ediyoruz
+    // Bu işlem bir sonraki frame'de rebuild tetikler
+    ref.invalidate(sessionAttendanceProvider(widget.sessionId));
   }
 
   void _endSession() async {
@@ -235,8 +250,8 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
                 ),
               );
             },
-            loading: () => const SkeletonListWidget(itemCount: 4),
-            error: (e, s) => Center(child: Text("Hata: $e")),
+            loading: () => const Expanded(child: SkeletonListWidget(itemCount: 4)),
+            error: (e, s) => Expanded(child: Center(child: Text("Hata: $e"))),
           ),
         ],
       ),

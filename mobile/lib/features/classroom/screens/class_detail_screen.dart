@@ -333,7 +333,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
               final sessionId = await ref.read(attendanceControllerProvider.notifier).startSession(classId: widget.classId);
               
               if (context.mounted) {
-                Navigator.push(
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => TeacherAttendanceScreen(
@@ -343,6 +343,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                     ),
                   ),
                 );
+                // Refresh history when returning from attendance screen
+                ref.invalidate(classHistoryProvider(widget.classId));
               }
             } catch (e) {
               if (context.mounted) {
@@ -365,7 +367,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         data: (sessionMap) {
           if (sessionMap == null) return null; // No active session
           
-          final sessionId = sessionMap['attendanceId'];
+          final sessionId = sessionMap['attendanceId'].toString();
           
           // Check if already attended?
           final attendanceStatusAsync = ref.watch(userAttendanceStatusProvider(

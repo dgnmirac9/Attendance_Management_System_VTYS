@@ -22,8 +22,7 @@ final classAnnouncementsProvider = FutureProvider.family<List<Map<String, dynami
 // Assuming CourseService has getStudents or similar. If not, we need to add it or use /courses/:id/students
 final classStudentsProvider = FutureProvider.family<List<UserModel>, String>((ref, classId) async {
   final service = ref.watch(courseServiceProvider);
-  // We want to refresh this when class details change (e.g. new student joins)
-  ref.watch(classDetailsProvider(classId)); 
+  // Independent fetch, do not watch classDetails to avoid loops
   return service.getCourseStudents(classId);
 });
 

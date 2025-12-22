@@ -36,7 +36,7 @@ class AttendanceService {
 
   Future<void> endAttendance(String sessionId) async {
     try {
-      await _apiClient.post('/attendance/$sessionId/end', data: {});
+      await _apiClient.put('/attendance/$sessionId/close', data: {});
     } on DioException catch (e) {
       throw e.response?.data['message'] ?? 'Yoklama sonlandırılamadı.';
     }
@@ -47,15 +47,13 @@ class AttendanceService {
       final Map<String, dynamic> checkInData = {
         'attendance_id': int.parse(sessionId),
         if (scannedCode != null) 'qr_code': scannedCode,
-        // 'location': ... 
       };
 
       FormData formData = FormData.fromMap({
-        'check_in_data': jsonEncode(checkInData), // Send Pydantic model as JSON string
+        'check_in_data': jsonEncode(checkInData),
         'face_image': await MultipartFile.fromFile(faceImagePath),
       });
 
-      // Endpoint is /check-in, not /join
       await _apiClient.post('/attendance/check-in', data: formData);
     } on DioException catch (e) {
       throw e.response?.data['message'] ?? 'Yoklamaya katılınamadı.';
@@ -71,27 +69,26 @@ class AttendanceService {
     }
   }
   
-  // Get active session for a class (for student to see if they can join)
   Future<Map<String, dynamic>?> getActiveSession(String classId) async {
     try {
       final response = await _apiClient.get('/attendance/mobile/course/$classId/sessions');
       final sessions = List<Map<String, dynamic>>.from(response.data);
       
-      // Find active session
       for (var session in sessions) {
         if (session['isActive'] == true || session['is_active'] == true) {
           return session;
         }
       }
-      return null; // No active session
+      return null;
     } catch (e) {
-       return null; // Return null if no active session or error
+       return null;
     }
   }
 
   Future<List<Map<String, dynamic>>> getLiveAttendance(String sessionId) async {
     try {
-      final response = await _apiClient.get('/attendance/$sessionId/participants');
+      // Backend endpoint is /attendance/{id}/records
+      final response = await _apiClient.get('/attendance/$sessionId/records');
       return List<Map<String, dynamic>>.from(response.data);
     } on DioException catch (e) {
       throw e.response?.data['message'] ?? 'Katılımcılar alınamadı.';
