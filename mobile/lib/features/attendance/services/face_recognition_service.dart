@@ -12,6 +12,10 @@ class FaceRecognitionService {
   static final FaceRecognitionService _instance = FaceRecognitionService._internal();
   static FaceRecognitionService get instance => _instance;
 
+  factory FaceRecognitionService() {
+    return _instance;
+  }
+
   Interpreter? _interpreter;
   // MobileFaceNet output size is usually 192
   static const int _outputSize = 192;

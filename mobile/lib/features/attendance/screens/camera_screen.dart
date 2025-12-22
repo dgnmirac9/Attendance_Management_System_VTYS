@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:attendance_management_system_vtys/features/attendance/services/face_recognition_service.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
@@ -23,6 +24,8 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _initCamera() async {
+    debugPrint("Model yüklemesi başlatılıyor..");
+    await FaceRecognitionService().loadModel();
     final cameras = await availableCameras();
     final firstCamera = cameras.firstWhere(
       (camera) => camera.lensDirection == CameraLensDirection.front,
