@@ -13,10 +13,31 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U clens_user -d clens_db"]
+      test: [ "CMD-SHELL", "pg_isready -U clens_user -d clens_db" ]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - clens_network
+
+  backend:
+    build: .
+    container_name: clens_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://clens_user:password@postgres:5432/clens_db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=your_secret_key_change_me_in_production
+      - ENVIRONMENT=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./.deepface:/root/.deepface
     networks:
       - clens_network
 
@@ -28,7 +49,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5

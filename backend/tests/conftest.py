@@ -1,10 +1,17 @@
 """Pytest configuration and fixtures"""
 
 import pytest
+import sys
+from unittest.mock import MagicMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
+# Global MOCK for FaceService to prevent import errors in tests
+sys.modules["app.services.face_service"] = MagicMock()
+sys.modules["deepface"] = MagicMock()
+sys.modules["cv2"] = MagicMock()
+sys.modules["numpy"] = MagicMock()
 from app.database import Base, get_db
 from app.main import app
 from app.config import settings

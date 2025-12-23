@@ -59,11 +59,7 @@ class Course(Base):
         back_populates="course",
         cascade="all, delete-orphan"
     )
-    shared_notes = relationship(
-        "StudentSharedNote",
-        back_populates="course",
-        cascade="all, delete-orphan"
-    )
+    # Removed: shared_notes relationship
     surveys = relationship(
         "Survey",
         back_populates="course",

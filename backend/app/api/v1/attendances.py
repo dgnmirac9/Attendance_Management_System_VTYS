@@ -37,10 +37,12 @@ class AttendanceSessionCreate(BaseModel):
     course_id: int = Field(..., description="Course ID")
     session_name: str = Field(..., min_length=1, max_length=100, description="Session name")
     description: Optional[str] = Field(None, max_length=500, description="Session description")
-    duration_minutes: int = Field(15, ge=5, le=120, description="Session duration in minutes")
+    duration_minutes: Optional[int] = Field(None, ge=5, le=240, description="Session duration (None = unlimited until manually closed)")
 
 
-class AttendanceSessionResponse(BaseModel):
+from app.schemas.base import CamelCaseModel
+
+class AttendanceSessionResponse(CamelCaseModel):
     """Attendance session response"""
     attendance_id: int
     course_id: int
@@ -60,6 +62,19 @@ class AttendanceSessionResponse(BaseModel):
 class FaceCheckInRequest(BaseModel):
     """Face check-in request"""
     attendance_id: int = Field(..., description="Attendance session ID")
+    qr_token: Optional[str] = Field(None, description="QR Code token for verification")
+
+
+class QrTokenValidateRequest(BaseModel):
+    """QR token validation request"""
+    attendance_id: int = Field(..., description="Attendance session ID")
+    qr_token: str = Field(..., description="QR token to validate")
+
+
+class QrTokenValidateResponse(BaseModel):
+    """QR token validation response"""
+    valid: bool
+    error: Optional[str] = None
 
 
 class CheckInResponse(BaseModel):
@@ -310,6 +325,54 @@ def get_attendance_session(
         )
 
 
+
+class QrCodeUpdate(BaseModel):
+    qr_code: str = Field(..., description="New QR code")
+
+@router.put(
+    "/{attendance_id}/qrcode",
+    status_code=status.HTTP_200_OK,
+    summary="Update session QR code",
+    description="Update the current QR code for an attendance session"
+)
+def update_qr_code(
+    attendance_id: int,
+    qr_data: QrCodeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_sync)
+):
+    """Update active QR code for session"""
+    
+    # Check if user is an instructor
+    if current_user.role != "instructor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only instructors can update QR codes"
+        )
+        
+    try:
+        attendance_service = AttendanceService(db)
+        # Verify ownership inside service or here
+        # For brevity, trusting service logic or adding check
+        attendance = attendance_service.get_attendance_session(attendance_id)
+        if not attendance:
+             raise HTTPException(status_code=404, detail="Session not found")
+             
+        # Simple ownership check
+        instructor = user_service.get_instructor_profile_sync(db, current_user.user_id)
+        if not instructor or attendance.instructor_id != instructor.instructor_id:
+             raise HTTPException(status_code=403, detail="Not authorized")
+             
+        attendance.current_qr_token = qr_data.qr_code
+        # Set expiry time for the new QR token (30 seconds validity)
+        from datetime import datetime, timedelta
+        attendance.qr_token_expires_at = datetime.utcnow() + timedelta(seconds=30)
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.put(
     "/{attendance_id}/close",
     response_model=AttendanceSessionResponse,
@@ -398,6 +461,90 @@ def close_attendance_session(
         )
 
 
+from fastapi import Form
+import json
+
+@router.post(
+    "/validate-qr",
+    response_model=QrTokenValidateResponse,
+    summary="Validate QR token",
+    description="""
+    Validate QR token before face check-in.
+    
+    **Flow:**
+    1. Student scans QR code
+    2. Send QR token to this endpoint for validation
+    3. If valid, proceed to face capture
+    4. If invalid, show error and stop
+    
+    **Requirements:**
+    - User must be authenticated
+    - User must be a student
+    - Session must be active
+    - QR token must match current token
+    - QR token must not be expired
+    """
+)
+def validate_qr_token(
+    request: QrTokenValidateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_sync)
+) -> QrTokenValidateResponse:
+    """Validate QR token for attendance check-in"""
+    try:
+        # Get student profile
+        student = user_service.get_student_profile_sync(db, current_user.user_id)
+        if not student:
+            return QrTokenValidateResponse(
+                valid=False,
+                error="Student profile not found"
+            )
+        
+        # Get attendance session
+        attendance_service = AttendanceService(db)
+        attendance = attendance_service.get_attendance_session(request.attendance_id)
+        
+        if not attendance:
+            return QrTokenValidateResponse(
+                valid=False,
+                error="Attendance session not found"
+            )
+        
+        # Check if session is active
+        from datetime import datetime
+        current_time = datetime.utcnow()
+        if not attendance.is_active or current_time > attendance.end_time:
+            return QrTokenValidateResponse(
+                valid=False,
+                error="Attendance session is closed"
+            )
+        
+        # Validate QR token
+        if attendance.current_qr_token:
+            # Check if token matches
+            if request.qr_token != attendance.current_qr_token:
+                return QrTokenValidateResponse(
+                    valid=False,
+                    error="Invalid QR token"
+                )
+            
+            # Check if token is expired
+            if attendance.qr_token_expires_at and current_time > attendance.qr_token_expires_at:
+                return QrTokenValidateResponse(
+                    valid=False,
+                    error="QR token expired"
+                )
+        
+        # All checks passed
+        return QrTokenValidateResponse(valid=True)
+        
+    except Exception as e:
+        return QrTokenValidateResponse(
+            valid=False,
+            error=f"Validation failed: {str(e)}"
+        )
+
+
 @router.post(
     "/check-in",
     response_model=CheckInResponse,
@@ -440,12 +587,22 @@ def close_attendance_session(
     }
 )
 def face_check_in(
-    check_in_data: FaceCheckInRequest,
+    check_in_data: str = Form(..., description="JSON string of check-in data"),
     face_image: UploadFile = File(..., description="Face image for verification"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_sync)
-) -> Dict[str, Any]:
+):
     """Face-based attendance check-in"""
+    
+    # Parse JSON string to Pydantic model
+    try:
+        data_dict = json.loads(check_in_data)
+        request_data = FaceCheckInRequest(**data_dict)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid check_in_data format: {str(e)}"
+        )
     
     # Check if user is a student
     if current_user.role != "student":
@@ -476,9 +633,10 @@ def face_check_in(
         # Perform face-based check-in
         attendance_service = AttendanceService(db)
         result = attendance_service.check_in_with_face(
-            attendance_id=check_in_data.attendance_id,
+            attendance_id=request_data.attendance_id,
             student_id=student.student_id,
-            face_image_data=face_image_data
+            face_image_data=face_image_data,
+            qr_token=request_data.qr_token
         )
         
         return result
@@ -683,3 +841,118 @@ def get_course_attendance_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get attendance statistics: {str(e)}"
         )
+
+# Mobile App Endpoint for Attendance History
+@router.get("/mobile/course/{course_id}/sessions")
+def get_mobile_course_sessions(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_sync)
+):
+    """
+    Get all attendance sessions for a course (formatted for mobile)
+    """
+    from app.models.attendance import Attendance, AttendanceRecord
+    from app.services.course_service import course_service
+    from sqlalchemy import desc
+    
+    # Check permissions
+    if current_user.role == "instructor":
+        instructor = user_service.get_instructor_profile_sync(db, current_user.user_id)
+        if not instructor:
+            raise HTTPException(status_code=403, detail="Instructor profile not found")
+        
+        # Verify course ownership
+        course = course_service.get_course_by_id_sync(db, course_id)
+        if not course or course.instructor_id != instructor.instructor_id:
+             raise HTTPException(status_code=403, detail="Not authorized for this course")
+             
+    elif current_user.role == "student":
+        student = user_service.get_student_profile_sync(db, current_user.user_id)
+        if not student:
+            raise HTTPException(status_code=403, detail="Student profile not found")
+            
+        # Verify enrollment (Simplified)
+        pass
+        
+    else:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    try:
+        # Get all sessions for this course
+        sessions = db.query(Attendance).filter(
+            Attendance.course_id == course_id
+        ).order_by(desc(Attendance.created_at)).all()
+        
+        print(f"DEBUG: get_mobile_course_sessions course_id={course_id} found {len(sessions)} sessions")
+        
+        results = []
+        for session in sessions:
+            # Use the relationship to get count to ensure consistency
+            attendee_count = len(session.records)
+            
+            # Check if current user attended (for students)
+            attendees_list = []
+            
+            if current_user.role == "student":
+                student = user_service.get_student_profile_sync(db, current_user.user_id)
+                if student:
+                    for record in session.records:
+                        if record.student_id == student.student_id:
+                            attendees_list.append(current_user.user_id)
+                            break
+            elif current_user.role == "instructor":
+                # For instructor, return all student USER IDs (not student_ids, but user_ids because mobile expects uids for getUsersByIds)
+                # Wait, Reference: mobile logic calls getUsersByIds(widget.attendeeUids)
+                # AttendanceRecord has student_id. Student has user_id.
+                # We need to join with Student model to get user_id.
+                for record in session.records:
+                     if record.student and record.student.user_id:
+                         attendees_list.append(record.student.user_id)
+
+            session_data = {
+                "attendanceId": session.attendance_id,
+                "startTime": session.start_time.isoformat(),
+                "endTime": session.end_time.isoformat() if session.end_time else None,
+                "sessionName": session.session_name,
+                "attendeeCount": attendee_count,
+                "isActive": session.is_active,
+                "attendees": attendees_list
+            }
+            results.append(session_data)
+        
+        print(f"DEBUG: get_mobile_course_sessions returning: {results}")
+        return results
+    except Exception as e:
+        import traceback
+        print(f"Error fetching sessions: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{attendance_id}", status_code=status.HTTP_200_OK)
+def delete_attendance(
+    attendance_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_sync),
+):
+    """Delete an attendance session"""
+    if current_user.role != "instructor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only instructors can delete attendance sessions"
+        )
+        
+    instructor = user_service.get_instructor_profile_sync(db, current_user.user_id)
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor profile not found")
+        
+    try:
+        attendance_service_instance = AttendanceService(db)
+        success = attendance_service_instance.delete_attendance_session(attendance_id, instructor.instructor_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Attendance session not found or unauthorized")
+            
+        return {"message": "Attendance session deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

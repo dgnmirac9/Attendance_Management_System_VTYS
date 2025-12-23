@@ -45,3 +45,6 @@
 **/*generated_plugins*
 GeneratedPluginRegistrant.swift
 
+# Deepface agirlik dosyalari
+*.h5
+backend/.deepface/weights/

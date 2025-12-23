@@ -3,6 +3,7 @@
 import string
 import random
 from typing import Optional, List
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -60,12 +61,12 @@ class CourseService:
             # Create course
             course = Course(
                 course_name=course_data.course_name,
-                course_code=course_data.course_code,
+                course_code=course_data.course_name[:3].upper() + str(random.randint(100, 999)) if len(course_data.course_name) >= 3 else "CSE" + str(random.randint(100, 999)),
                 description=course_data.description,
                 instructor_id=instructor_id,
                 join_code=join_code,
                 semester=course_data.semester,
-                year=course_data.year,
+                year=datetime.now().year,
                 credits=course_data.credits,
                 max_students=course_data.max_students,
                 is_active=True
@@ -115,12 +116,12 @@ class CourseService:
             # Create course
             course = Course(
                 course_name=course_data.course_name,
-                course_code=course_data.course_code,
+                course_code=course_data.course_name[:3].upper() + str(random.randint(100, 999)) if len(course_data.course_name) >= 3 else "CSE" + str(random.randint(100, 999)),
                 description=course_data.description,
                 instructor_id=instructor_id,
                 join_code=join_code,
                 semester=course_data.semester,
-                year=course_data.year,
+                year=datetime.now().year,
                 credits=course_data.credits,
                 max_students=course_data.max_students,
                 is_active=True
@@ -397,10 +398,17 @@ class CourseService:
         # Check if already enrolled
         existing_enrollment = await self._get_enrollment(db, course.course_id, student_id)
         if existing_enrollment:
-            raise AppException(
-                message="You are already enrolled in this course",
-                status_code=409
-            )
+            if existing_enrollment.enrollment_status == "active":
+                raise AppException(
+                    message="You are already enrolled in this course",
+                    status_code=409
+                )
+            # If dropped, reactivate
+            existing_enrollment.enrollment_status = "active"
+            existing_enrollment.joined_at = datetime.now() # Update join time
+            await db.commit()
+            await db.refresh(existing_enrollment)
+            return existing_enrollment
         
         # Check course capacity
         if course.max_students:
@@ -455,10 +463,17 @@ class CourseService:
         # Check if already enrolled
         existing_enrollment = self._get_enrollment_sync(db, course.course_id, student_id)
         if existing_enrollment:
-            raise AppException(
-                message="You are already enrolled in this course",
-                status_code=409
-            )
+            if existing_enrollment.enrollment_status == "active":
+                raise AppException(
+                    message="You are already enrolled in this course",
+                    status_code=409
+                )
+            # If dropped, reactivate
+            existing_enrollment.enrollment_status = "active"
+            existing_enrollment.joined_at = datetime.now()
+            db.commit()
+            db.refresh(existing_enrollment)
+            return existing_enrollment
         
         # Check course capacity
         if course.max_students:
@@ -562,6 +577,48 @@ class CourseService:
         if course.instructor_id != instructor_id:
             raise AppException(
                 message="You don't have permission to view this course's students",
+                status_code=403
+            )
+        
+        # Get enrolled students
+        from app.models.user import Student
+        students = db.query(Student)\
+            .join(CourseEnrollment, Student.student_id == CourseEnrollment.student_id)\
+            .filter(
+                and_(
+                    CourseEnrollment.course_id == course_id,
+                    CourseEnrollment.enrollment_status == "active"
+                )
+            )\
+            .order_by(Student.student_number)\
+            .all()
+        
+        return students
+    
+    def get_course_students_for_student_sync(
+        self,
+        db: Session,
+        course_id: int,
+        student_id: int
+    ) -> List[Student]:
+        """
+        Get list of students enrolled in a course (for student view)
+        
+        Args:
+            db: Database session
+            course_id: Course ID
+            student_id: Requesting Student ID (for enrollment check)
+            
+        Returns:
+            List of enrolled students
+            
+        Raises:
+            AppException: If course not found or not enrolled
+        """
+        # Check enrollment
+        if not self.check_enrollment_sync(db, course_id, student_id):
+            raise AppException(
+                message="You are not enrolled in this course",
                 status_code=403
             )
         
@@ -751,10 +808,35 @@ class CourseService:
         enrollment = await self._get_enrollment(db, course_id, student_id)
         return enrollment is not None and enrollment.enrollment_status == "active"
     
+    def _get_enrollment_sync(
+        self,
+        db: Session,
+        course_id: int,
+        student_id: int
+    ) -> Optional[CourseEnrollment]:
+        """
+        Get enrollment record (internal helper)
+        
+        Args:
+            db: Database session
+            course_id: Course ID
+            student_id: Student ID
+            
+        Returns:
+            Enrollment object or None
+        """
+        return db.query(CourseEnrollment).filter(
+            and_(
+                CourseEnrollment.course_id == course_id,
+                CourseEnrollment.student_id == student_id
+            )
+        ).first()
+
     def check_enrollment_sync(
         self,
         db: Session,
         course_id: int,
+
         student_id: int
     ) -> bool:
         """

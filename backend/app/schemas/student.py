@@ -1,16 +1,15 @@
 """Student schemas for request/response validation"""
 
-from pydantic import BaseModel, Field
+from app.schemas.base import CamelCaseModel
+from pydantic import Field
 from typing import Optional, List
 from datetime import datetime
 
 
-class StudentBase(BaseModel):
+class StudentBase(CamelCaseModel):
     """Base student schema"""
-    student_number: str = Field(..., min_length=1, max_length=20)
-    department: str = Field(..., min_length=1, max_length=100)
-    class_level: int = Field(..., ge=1, le=4)
-    enrollment_year: int = Field(..., ge=1900, le=2100)
+    student_number: str = Field(..., min_length=9, max_length=9, pattern=r"^\d{9}$")
+    # Removed: department, class_level, enrollment_year
 
 
 class StudentCreate(StudentBase):
@@ -18,10 +17,9 @@ class StudentCreate(StudentBase):
     user_id: int
 
 
-class StudentUpdate(BaseModel):
+class StudentUpdate(CamelCaseModel):
     """Schema for updating student profile"""
-    department: Optional[str] = Field(None, min_length=1, max_length=100)
-    class_level: Optional[int] = Field(None, ge=1, le=4)
+    # Removed: department, class_level
     profile_image_url: Optional[str] = Field(None, max_length=255)
 
 
@@ -48,7 +46,7 @@ class StudentWithUserResponse(StudentResponse):
         from_attributes = True
 
 
-class StudentCourseResponse(BaseModel):
+class StudentCourseResponse(CamelCaseModel):
     """Schema for student's course information"""
     course_id: int
     course_name: str
@@ -61,7 +59,7 @@ class StudentCourseResponse(BaseModel):
         from_attributes = True
 
 
-class StudentAttendanceHistoryResponse(BaseModel):
+class StudentAttendanceHistoryResponse(CamelCaseModel):
     """Schema for student's attendance history"""
     total_sessions: int
     attended: int
@@ -69,7 +67,7 @@ class StudentAttendanceHistoryResponse(BaseModel):
     records: List['AttendanceRecordResponse']
 
 
-class AttendanceRecordResponse(BaseModel):
+class AttendanceRecordResponse(CamelCaseModel):
     """Schema for individual attendance record"""
     attendance_id: int
     date: datetime

@@ -75,3 +75,10 @@ class AttendanceRecordsListResponse(BaseModel):
     is_active: bool
     total_records: int
     records: List[AttendanceRecordResponse]
+
+
+class AttendanceQRTokenResponse(BaseModel):
+    """Schema for dynamic QR token"""
+    qr_token: str
+    expires_at: datetime
+    attendance_id: int

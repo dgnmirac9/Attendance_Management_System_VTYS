@@ -248,6 +248,27 @@ async def app_exception_handler(request: Request, exc: AppException):
     )
 
 
+from fastapi.exceptions import RequestValidationError
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle Pydantic validation errors"""
+    # Get the first error message for a cleaner response
+    details = exc.errors()
+    message = "Validation error"
+    if details:
+        # Format: "Field Name: Error message"
+        error = details[0]
+        field = error.get("loc", ["Unknown"])[-1]
+        msg = error.get("msg", "Invalid value")
+        message = f"{field}: {msg}"
+        
+    return JSONResponse(
+        status_code=422,
+        content={"detail": message, "error_type": "ValidationError"},
+    )
+
+
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle unexpected exceptions"""
@@ -265,9 +286,9 @@ async def startup_event():
     from app.database import engine, Base
     from app.models import user, course, attendance, assignment, content, token
     
-    print("🔧 Creating database tables...")
+    print("Starting database table creation...")
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created/verified")
+    print("Database tables created/verified")
 
 
 # Health check endpoint
@@ -334,74 +355,6 @@ def custom_openapi():
                 # Force add security to this endpoint
                 method["security"] = [{"BearerAuth": []}]
     
-    # Add example responses
-    openapi_schema["components"]["examples"] = {
-        "StudentRegistration": {
-            "summary": "Student Registration",
-            "value": {
-                "email": "student@university.edu",
-                "password": "SecurePass123",
-                "full_name": "John Doe",
-                "role": "student",
-                "student_number": "2024001",
-                "department": "Computer Engineering",
-                "class_level": 2,
-                "enrollment_year": 2024
-            }
-        },
-        "InstructorRegistration": {
-            "summary": "Instructor Registration",
-            "value": {
-                "email": "instructor@university.edu",
-                "password": "SecurePass123",
-                "full_name": "Dr. Jane Smith",
-                "role": "instructor",
-                "title": "Prof. Dr.",
-                "office_info": "A-101"
-            }
-        },
-        "LoginRequest": {
-            "summary": "Login Request",
-            "value": {
-                "email": "student@university.edu",
-                "password": "SecurePass123"
-            }
-        },
-        "TokenResponse": {
-            "summary": "Successful Authentication",
-            "value": {
-                "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-                "token_type": "bearer",
-                "user": {
-                    "user_id": 1,
-                    "email": "student@university.edu",
-                    "full_name": "John Doe",
-                    "role": "student",
-                    "created_at": "2024-01-01T00:00:00Z"
-                }
-            }
-        },
-        "ErrorResponse": {
-            "summary": "Error Response",
-            "value": {
-                "detail": "Invalid credentials",
-                "error_type": "AuthenticationError"
-            }
-        },
-        "ValidationError": {
-            "summary": "Validation Error",
-            "value": {
-                "detail": [
-                    {
-                        "loc": ["body", "email"],
-                        "msg": "value is not a valid email address",
-                        "type": "value_error.email"
-                    }
-                ]
-            }
-        }
-    }
-    
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
@@ -412,7 +365,7 @@ app.openapi = custom_openapi
 # Include API routers
 from app.api.v1 import auth, debug
 
-print(f"🔍 Importing routers...")
+print(f"Importing routers...")
 print(f"  - Auth router: {len(auth.router.routes)} routes")
 print(f"  - Debug router: {len(debug.router.routes)} routes")
 
@@ -422,99 +375,125 @@ try:
     print(f"  - Face router: {len(face.router.routes)} routes")
     FACE_ROUTER_AVAILABLE = True
 except Exception as e:
-    print(f"  ⚠️  Face router import failed: {e}")
+    print(f"  [WARN] Face router import failed: {e}")
     face = None
     FACE_ROUTER_AVAILABLE = False
 
-# Try to import students router
 try:
     from app.api.v1 import students
     print(f"  - Students router: {len(students.router.routes)} routes")
     STUDENTS_ROUTER_AVAILABLE = True
 except Exception as e:
-    print(f"  ⚠️  Students router import failed: {e}")
+    print(f"  [WARN] Students router import failed: {e}")
     students = None
     STUDENTS_ROUTER_AVAILABLE = False
 
-# Try to import instructors router
 try:
     from app.api.v1 import instructors
     print(f"  - Instructors router: {len(instructors.router.routes)} routes")
     INSTRUCTORS_ROUTER_AVAILABLE = True
 except Exception as e:
-    print(f"  ⚠️  Instructors router import failed: {e}")
+    print(f"  [WARN] Instructors router import failed: {e}")
     instructors = None
     INSTRUCTORS_ROUTER_AVAILABLE = False
 
-# Try to import test_auth router
 try:
     from app.api.v1 import test_auth
     print(f"  - Test Auth router: {len(test_auth.router.routes)} routes")
     TEST_AUTH_ROUTER_AVAILABLE = True
 except Exception as e:
-    print(f"  ⚠️  Test Auth router import failed: {e}")
+    print(f"  [WARN] Test Auth router import failed: {e}")
     test_auth = None
     TEST_AUTH_ROUTER_AVAILABLE = False
 
-# Try to import courses router
 try:
     from app.api.v1 import courses
     print(f"  - Courses router: {len(courses.router.routes)} routes")
     COURSES_ROUTER_AVAILABLE = True
 except Exception as e:
-    print(f"  ⚠️  Courses router import failed: {e}")
+    print(f"  [WARN] Courses router import failed: {e}")
     courses = None
     COURSES_ROUTER_AVAILABLE = False
 
-# Try to import attendances router
 try:
     from app.api.v1 import attendances
     print(f"  - Attendances router: {len(attendances.router.routes)} routes")
     ATTENDANCES_ROUTER_AVAILABLE = True
 except Exception as e:
-    print(f"  ⚠️  Attendances router import failed: {e}")
+    print(f"  [WARN] Attendances router import failed: {e}")
     attendances = None
     ATTENDANCES_ROUTER_AVAILABLE = False
+
+try:
+    from app.api.v1 import users
+    print(f"  - Users router: {len(users.router.routes)} routes")
+    USERS_ROUTER_AVAILABLE = True
+except Exception as e:
+    print(f"  [WARN] Users router import failed: {e}")
+    users = None
+    USERS_ROUTER_AVAILABLE = False
+
+try:
+    from app.api.v1 import announcements
+    print(f"  - Announcements router: {len(announcements.router.routes)} routes")
+    ANNOUNCEMENTS_ROUTER_AVAILABLE = True
+except Exception as e:
+    print(f"  [WARN] Announcements router import failed: {e}")
+    announcements = None
+    ANNOUNCEMENTS_ROUTER_AVAILABLE = False
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 
 if FACE_ROUTER_AVAILABLE and face:
     app.include_router(face.router, prefix="/api/v1/face", tags=["Face Recognition"])
-    print(f"✅ Face router included!")
+    print(f"[SUCCESS] Face router included!")
 else:
-    print(f"⚠️  Face router NOT included - face recognition features disabled")
+    print(f"[WARN] Face router NOT included - face recognition features disabled")
 
 if STUDENTS_ROUTER_AVAILABLE and students:
     app.include_router(students.router, prefix="/api/v1/students", tags=["Students"])
-    print(f"✅ Students router included!")
+    print(f"[SUCCESS] Students router included!")
 else:
-    print(f"⚠️  Students router NOT included")
+    print(f"[WARN] Students router NOT included")
 
 if INSTRUCTORS_ROUTER_AVAILABLE and instructors:
     app.include_router(instructors.router, prefix="/api/v1/instructors", tags=["Instructors"])
-    print(f"✅ Instructors router included!")
+    print(f"[SUCCESS] Instructors router included!")
 else:
-    print(f"⚠️  Instructors router NOT included")
+    print(f"[WARN] Instructors router NOT included")
 
 if TEST_AUTH_ROUTER_AVAILABLE and test_auth:
-    app.include_router(test_auth.router, prefix="/api/v1/test", tags=["🧪 Test Authentication"])
-    print(f"✅ Test Auth router included!")
+    app.include_router(test_auth.router, prefix="/api/v1/test", tags=["[TEST] Test Authentication"])
+    print(f"[SUCCESS] Test Auth router included!")
 else:
-    print(f"⚠️  Test Auth router NOT included")
+    print(f"[WARN] Test Auth router NOT included")
 
 if COURSES_ROUTER_AVAILABLE and courses:
     app.include_router(courses.router, prefix="/api/v1/courses", tags=["Courses"])
-    print(f"✅ Courses router included!")
+    print(f"[SUCCESS] Courses router included!")
 else:
-    print(f"⚠️  Courses router NOT included")
+    print(f"[WARN] Courses router NOT included")
 
 if ATTENDANCES_ROUTER_AVAILABLE and attendances:
-    app.include_router(attendances.router, prefix="/api/v1/attendances", tags=["Attendances"])
-    print(f"✅ Attendances router included!")
+    # Changed prefix to /attendance to match Mobile App
+    app.include_router(attendances.router, prefix="/api/v1/attendance", tags=["Attendances"])
+    print(f"[SUCCESS] Attendances router included!")
 else:
-    print(f"⚠️  Attendances router NOT included")
+    print(f"[WARN] Attendances router NOT included")
 
-print(f"✅ Routers included successfully!")
+if USERS_ROUTER_AVAILABLE and users:
+    app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+    print(f"[SUCCESS] Users router included!")
+else:
+    print(f"[WARN] Users router NOT included")
+
+if ANNOUNCEMENTS_ROUTER_AVAILABLE and announcements:
+    app.include_router(announcements.router, prefix="/api/v1/announcements", tags=["Announcements"])
+    print(f"[SUCCESS] Announcements router included!")
+else:
+    print(f"[WARN] Announcements router NOT included")
+
+print(f"[SUCCESS] Routers included successfully!")
 print(f"  - Total app routes: {len(app.routes)}")
 
 # Debug endpoints (development only)

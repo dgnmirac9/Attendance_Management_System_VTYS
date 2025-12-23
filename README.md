@@ -10,7 +10,7 @@ Bu proje, geleneksel imza veya isim okuma yöntemlerinin yerini alarak; Yüz Tan
 
 * **📱 Mobil Uygulama (Flutter):** Öğrenciler için kullanıcı dostu arayüz.
 * **👤 Yüz Tanıma (AI):** Kameradan alınan anlık görüntünün, kayıtlı biyometrik veri ile eşleştirilmesi.
-* **📍 Konum Doğrulama:** Yoklamanın sadece sınıf sınırları içerisinde verilebilmesi.
+* **📍 KareKod Doğrulama:** Yoklamanın sadece Akademisyen Gözetiminde verilebilmesi.
 * **🏫 Sanal Sınıflar:** Google Classroom benzeri kod ile derse katılım yapısı.
 * **📊 Anlık Takip:** Akademisyenler için anlık katılım raporları.
 

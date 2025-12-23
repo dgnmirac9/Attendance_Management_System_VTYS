@@ -19,15 +19,24 @@ def reset_database():
     # Create engine
     engine = create_engine(settings.DATABASE_URL)
     
-    # Drop all tables
+    # Drop all tables with CASCADE
     print("Dropping all tables...")
-    Base.metadata.drop_all(bind=engine)
-    print("✓ All tables dropped")
+    
+    if settings.DATABASE_URL.startswith("sqlite"):
+        Base.metadata.drop_all(bind=engine)
+    else:
+        # PostgreSQL specific: Drop all tables in public schema
+        with engine.connect() as conn:
+            # Disable constraint checking temporarily if needed, but CASCADE is better
+            conn.execute(text("DO $$ DECLARE r RECORD; BEGIN FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE'; END LOOP; END $$;"))
+            conn.commit()
+            
+    print("All tables dropped")
     
     # Create all tables
     print("Creating all tables...")
     Base.metadata.create_all(bind=engine)
-    print("✓ All tables created")
+    print("All tables created")
     
     # Verify tables
     with engine.connect() as conn:
@@ -38,11 +47,11 @@ def reset_database():
             result = conn.execute(text("SELECT tablename FROM pg_tables WHERE schemaname='public'"))
             tables = [row[0] for row in result]
         
-        print(f"\n✓ Created {len(tables)} tables:")
+        print(f"\nCreated {len(tables)} tables:")
         for table in sorted(tables):
             print(f"  - {table}")
     
-    print("\n✅ Database reset complete!")
+    print("\nDatabase reset complete!")
 
 if __name__ == "__main__":
     reset_database()

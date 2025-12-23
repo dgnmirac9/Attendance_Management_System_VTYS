@@ -1,50 +1,37 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; 
-import 'routes.dart';
-import 'shared/themes/app_theme.dart';
-import 'shared/themes/theme_manager.dart'; // Yeni oluşturduğumuz yönetici
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'features/auth/screens/auth_wrapper.dart';
+import 'core/theme/app_theme.dart';
+import 'core/providers/theme_provider.dart';
 
-Future<void> main() async {
+import 'package:intl/date_symbol_data_local.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 1. Kayıtlı Temayı Yükle
-  await ThemeManager.loadTheme();
-
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    // Firebase removed for API integration
+    // await Firebase.initializeApp();
+    await initializeDateFormatting('tr_TR', null);
   } catch (e) {
-    debugPrint("Firebase hatası: $e");
+    debugPrint('Initialization failed: $e');
   }
-
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // 2. Temayı Dinleyen Yapı (ValueListenableBuilder)
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeManager.themeNotifier,
-      builder: (context, currentMode, child) {
-        return MaterialApp(
-          title: 'C-LENS',
-          debugShowCheckedModeBanner: false,
-          
-          // Temalar
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: currentMode, // Dinamik olarak burası değişecek
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeProvider);
 
-          // Rota
-          initialRoute: Routes.login,
-          onGenerateRoute: Routes.onGenerateRoute,
-        );
-      },
+    return MaterialApp(
+      title: 'C-LENS',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      home: const AuthWrapper(),
     );
   }
 }

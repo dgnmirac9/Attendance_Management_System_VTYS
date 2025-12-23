@@ -1,14 +1,14 @@
 """Instructor schemas for request/response validation"""
 
-from pydantic import BaseModel, Field
+from app.schemas.base import CamelCaseModel
+from pydantic import Field
 from typing import Optional, List
 from datetime import datetime
 
 
-class InstructorBase(BaseModel):
+class InstructorBase(CamelCaseModel):
     """Base instructor schema"""
-    title: Optional[str] = Field(None, max_length=50)
-    office_info: Optional[str] = Field(None, max_length=100)
+    # Removed: title, office_info
 
 
 class InstructorCreate(InstructorBase):
@@ -16,10 +16,9 @@ class InstructorCreate(InstructorBase):
     user_id: int
 
 
-class InstructorUpdate(BaseModel):
+class InstructorUpdate(CamelCaseModel):
     """Schema for updating instructor profile"""
-    title: Optional[str] = Field(None, max_length=50)
-    office_info: Optional[str] = Field(None, max_length=100)
+    # Removed: title, office_info
     profile_image_url: Optional[str] = Field(None, max_length=255)
 
 
@@ -43,7 +42,7 @@ class InstructorWithUserResponse(InstructorResponse):
         from_attributes = True
 
 
-class InstructorCourseResponse(BaseModel):
+class InstructorCourseResponse(CamelCaseModel):
     """Schema for instructor's course information"""
     course_id: int
     course_name: str

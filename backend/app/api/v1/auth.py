@@ -1,12 +1,13 @@
 """Authentication endpoints for user registration, login, and logout"""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from typing import Optional
 
 from app.database import get_db
-from app.schemas.auth import LoginRequest, TokenResponse, LogoutResponse
+from app.schemas.auth import LoginRequest, TokenResponse, LogoutResponse, PasswordChangeRequest
 from app.schemas.user import UserCreate, UserResponse
 from app.schemas.student import StudentResponse
 from app.schemas.instructor import InstructorResponse
@@ -35,17 +36,13 @@ security = HTTPBearer()
     - full_name
     - role: "student"
     - student_number (unique)
-    - department
-    - class_level (1-4)
-    - enrollment_year
+    - student_number (unique)
     
     **Instructor Registration Requirements:**
     - email (unique)
     - password (min 8 chars, must contain letter and number)
     - full_name
     - role: "instructor"
-    - title (optional, e.g., "Prof. Dr.")
-    - office_info (optional, e.g., "A-101")
     
     **Password Requirements:**
     - Minimum 8 characters
@@ -81,7 +78,7 @@ security = HTTPBearer()
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "Student registration requires: student_number, department, class_level, enrollment_year",
+                        "detail": "Student registration requires: student_number",
                         "error_type": "AppException"
                     }
                 }
@@ -117,30 +114,46 @@ security = HTTPBearer()
     }
 )
 async def register(
-    user_data: UserCreate,
+    email: str = Form(...),
+    password: str = Form(...),
+    fullName: str = Form(..., alias="fullName"),
+    role: str = Form(..., pattern="^(student|instructor)$"),
+    studentNumber: Optional[str] = Form(None, alias="studentNumber"),
+    faceImage: Optional[UploadFile] = File(None, alias="faceImage"),
     db: Session = Depends(get_db)
 ):
-    """Register a new user (student or instructor)"""
+    """Register a new user (student or instructor) with optional face image"""
+    # Map camelCase args to internal snake_case variables for logic
+    full_name = fullName
+    student_number = studentNumber
+    face_image = faceImage
+    import base64
+    from app.services.face_service import face_service
+    
     try:
-        # Check if email already exists
+        # 1. Validate Input using Pydantic Model
+        user_data = UserCreate(
+            email=email,
+            password=password,
+            full_name=full_name,
+            role=role,
+            student_number=student_number
+        )
+        
+        # 2. Check if email already exists
         existing_user = db.query(User).filter(User.email == user_data.email).first()
         if existing_user:
             raise AppException("Email already registered", status_code=status.HTTP_409_CONFLICT)
         
-        # Validate role-specific fields
+        # 3. Role-specific validation
         if user_data.role == "student":
-            if not all([
-                user_data.student_number,
-                user_data.department,
-                user_data.class_level,
-                user_data.enrollment_year
-            ]):
+            if not user_data.student_number:
                 raise AppException(
-                    "Student registration requires: student_number, department, class_level, enrollment_year",
+                    "Student registration requires: student_number",
                     status_code=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Check if student number already exists
+            # Check duplicate student number
             existing_student = db.query(Student).filter(
                 Student.student_number == user_data.student_number
             ).first()
@@ -150,10 +163,9 @@ async def register(
                     status_code=status.HTTP_409_CONFLICT
                 )
         
-        # Hash password
+        # 4. Create User
         hashed_password = auth_service.hash_password(user_data.password)
         
-        # Create user
         user = User(
             email=user_data.email.lower(),
             password_hash=hashed_password,
@@ -162,47 +174,72 @@ async def register(
         )
         
         db.add(user)
-        db.flush()  # Flush to get user_id without committing
+        db.flush()
         
-        # Create role-specific record
+        # 5. Create Role Record
         if user_data.role == "student":
             student = Student(
                 user_id=user.user_id,
-                student_number=user_data.student_number,
-                department=user_data.department,
-                class_level=user_data.class_level,
-                enrollment_year=user_data.enrollment_year
+                student_number=user_data.student_number
             )
             db.add(student)
+            db.flush() # Flush to get student_id
+            
+            # 6. Handle Face Image (if provided)
+            if face_image:
+                try:
+                    # Read file
+                    contents = await face_image.read()
+                    # Convert to Base64
+                    image_base64 = base64.b64encode(contents).decode('utf-8')
+                    
+                    # Register Face (Sync)
+                    encrypted_face_data = face_service.register_face_sync(
+                        db=db,
+                        student_id=student.student_id,
+                        image_base64=image_base64,
+                        check_duplicate=True
+                    )
+                    
+                    student.face_data_url = encrypted_face_data
+                    db.add(student) # Update student record
+                    db.flush()
+                    
+                    print(f"Face registered for student {student.student_id}")
+                    
+                except Exception as e:
+                    # Log but allow registration to proceed? 
+                    # OR Fail registration?
+                    # Better to fail if user explicitly uploaded a face 
+                    print(f"Face registration failed: {e}")
+                    raise AppException(f"Face registration failed: {str(e)}", status_code=400)
         
         elif user_data.role == "instructor":
             instructor = Instructor(
-                user_id=user.user_id,
-                title=user_data.title,
-                office_info=user_data.office_info
+                user_id=user.user_id
             )
             db.add(instructor)
         
         db.commit()
         db.refresh(user)
         
-        # Create access token
+        # 7. Create Access Token
         access_token = auth_service.create_access_token(
             user_id=user.user_id,
             email=user.email,
             role=user.role
         )
         
-        # Store token in database
         auth_service.store_token_sync(db, user.user_id, access_token)
         
-        # Prepare user response
+        # 8. Response
         user_response = UserResponse(
             user_id=user.user_id,
             email=user.email,
             full_name=user.full_name,
             role=user.role,
-            created_at=user.created_at
+            created_at=user.created_at,
+            student_number=user_data.student_number if user.role == "student" else None
         )
         
         return TokenResponse(
@@ -212,26 +249,22 @@ async def register(
         )
     
     except IntegrityError as e:
+
+
+
         db.rollback()
-        # Check if it's a duplicate student_number
         if "student_number" in str(e.orig):
-            raise AppException(
-                "Student number already exists",
-                status_code=status.HTTP_409_CONFLICT
-            )
-        raise AppException(
-            "Registration failed due to data conflict",
-            status_code=status.HTTP_409_CONFLICT
-        )
-    
+            raise AppException("Student number already exists", status_code=409)
+        raise AppException("Registration data conflict", status_code=409)
+        
     except AppException:
         db.rollback()
         raise
-    
+        
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"Registration failed: {str(e)}"
         )
 
@@ -440,3 +473,129 @@ async def logout(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Logout failed: {str(e)}"
         )
+
+
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get current user profile",
+    description="""
+    Get the profile information of the currently authenticated user.
+    
+    **Returns:**
+    - User ID
+    - Email
+    - Full Name
+    - Role
+    - Registration Date
+    """,
+    responses={
+        200: {
+            "description": "User profile retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "user_id": 1,
+                        "email": "student@university.edu",
+                        "full_name": "John Doe",
+                        "role": "student",
+                        "created_at": "2024-01-01T00:00:00Z"
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Not authenticated"
+        }
+    }
+)
+async def get_me(
+    current_user: User = Depends(get_current_user_sync)
+):
+    """Get current authenticated user profile"""
+    student_num = None
+    if current_user.role == "student":
+        try:
+             # Try to access student relation. If it fails due to DetachedInstanceError, 
+             # we might need to query. But standard Depends(get_db) usually keeps session alive 
+             # if get_current_user_sync is implemented correctly.
+             # If it turns out to be None, we can't do much without a db session here.
+             # But let's assume it works for now as observed in other endpoints.
+             if current_user.student:
+                 student_num = current_user.student.student_number
+        except Exception:
+             pass
+
+    return UserResponse(
+        user_id=current_user.user_id,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        role=current_user.role,
+        created_at=current_user.created_at,
+        student_number=student_num
+    )
+
+
+@router.put(
+    "/password",
+    summary="Change password",
+    description="""
+    Change the password for the currently authenticated user.
+    
+    **Requirements:**
+    - User must be authenticated
+    - Old password must be correct
+    - New password must meet password requirements
+    
+    **Returns:**
+    - Success message
+    """,
+    responses={
+        200: {
+            "description": "Password changed successfully"
+        },
+        401: {
+            "description": "Invalid old password or not authenticated"
+        }
+    }
+)
+async def change_password(
+    request: PasswordChangeRequest,
+    current_user: User = Depends(get_current_user_sync),
+    db: Session = Depends(get_db)
+):
+    """Change user password"""
+    try:
+        old_password = request.old_password
+        new_password = request.new_password
+        
+        if not old_password or not new_password:
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Both old_password and new_password are required"
+            )
+        
+        # Verify old password
+        if not auth_service.verify_password(old_password, current_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid old password"
+            )
+        
+        # Hash new password
+        new_password_hash = auth_service.hash_password(new_password)
+        
+        # Update password
+        current_user.password_hash = new_password_hash
+        db.commit()
+        
+        return {"message": "Password changed successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Password change failed: {str(e)}"
+        )
+

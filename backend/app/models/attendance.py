@@ -28,6 +28,8 @@ class Attendance(Base):
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
     is_active = Column(Boolean, default=True)
+    current_qr_token = Column(String(255), nullable=True)
+    qr_token_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     
     # Relationships

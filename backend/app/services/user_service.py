@@ -62,17 +62,13 @@ class UserService:
         if user_data.role == "student":
             student = Student(
                 user_id=user.user_id,
-                student_number=user_data.student_number,
-                department=user_data.department
+                student_number=user_data.student_number
             )
             db.add(student)
         elif user_data.role == "instructor":
             instructor = Instructor(
                 user_id=user.user_id,
-                instructor_number=user_data.instructor_number,
-                department=user_data.department,
-                title=user_data.title,
-                office_info=user_data.office_info
+                instructor_number=user_data.instructor_number
             )
             db.add(instructor)
         
@@ -146,17 +142,13 @@ class UserService:
         if user_data.role == "student":
             student = Student(
                 user_id=user.user_id,
-                student_number=user_data.student_number,
-                department=user_data.department
+                student_number=user_data.student_number
             )
             db.add(student)
         elif user_data.role == "instructor":
             instructor = Instructor(
                 user_id=user.user_id,
-                instructor_number=user_data.instructor_number,
-                department=user_data.department,
-                title=user_data.title,
-                office_info=user_data.office_info
+                instructor_number=user_data.instructor_number
             )
             db.add(instructor)
         
@@ -292,8 +284,8 @@ class UserService:
             student = result.scalar_one_or_none()
             
             if student:
-                if user_data.department is not None:
-                    student.department = user_data.department
+                # Removed: student fields update
+                pass
         
         elif user.role == "instructor":
             result = await db.execute(
@@ -302,10 +294,8 @@ class UserService:
             instructor = result.scalar_one_or_none()
             
             if instructor:
-                if user_data.department is not None:
-                    instructor.department = user_data.department
-                if user_data.title is not None:
-                    instructor.title = user_data.title
+                # Removed: instructor fields update
+                pass
         
         await db.commit()
         await db.refresh(user)
@@ -362,17 +352,15 @@ class UserService:
             student = db.query(Student).filter(Student.user_id == user_id).first()
             
             if student:
-                if user_data.department is not None:
-                    student.department = user_data.department
+                # Removed: student fields update
+                pass
         
         elif user.role == "instructor":
             instructor = db.query(Instructor).filter(Instructor.user_id == user_id).first()
             
             if instructor:
-                if user_data.department is not None:
-                    instructor.department = user_data.department
-                if user_data.title is not None:
-                    instructor.title = user_data.title
+                # Removed: instructor fields update
+                pass
         
         db.commit()
         db.refresh(user)

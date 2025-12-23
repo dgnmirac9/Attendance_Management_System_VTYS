@@ -1,6 +1,6 @@
 """User models: User, Student, Instructor"""
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, CheckConstraint
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, CheckConstraint, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -59,10 +59,8 @@ class Student(Base):
         index=True
     )
     student_number = Column(String(20), unique=True, nullable=False, index=True)
-    department = Column(String(100), nullable=False)
-    class_level = Column(Integer, CheckConstraint("class_level BETWEEN 1 AND 4"))
-    enrollment_year = Column(Integer, nullable=False)
-    face_data_url = Column(String(255), nullable=True)
+    # Removed: department, class_level, enrollment_year
+    face_data_url = Column(Text, nullable=True)
     profile_image_url = Column(String(255), nullable=True)
     total_absences = Column(Integer, default=0)
     
@@ -83,11 +81,7 @@ class Student(Base):
         back_populates="student",
         cascade="all, delete-orphan"
     )
-    shared_notes = relationship(
-        "StudentSharedNote",
-        back_populates="student",
-        cascade="all, delete-orphan"
-    )
+    # Removed: shared_notes relationship
     survey_responses = relationship(
         "SurveyResponse",
         back_populates="student",
@@ -112,8 +106,7 @@ class Instructor(Base):
     )
     instructor_number = Column(String(20), unique=True, nullable=True, index=True)
     department = Column(String(100), nullable=True)
-    title = Column(String(50), nullable=True)
-    office_info = Column(String(100), nullable=True)
+    # Removed: title, office_info
     profile_image_url = Column(String(255), nullable=True)
     
     # Relationships
@@ -145,4 +138,4 @@ class Instructor(Base):
     )
     
     def __repr__(self):
-        return f"<Instructor(instructor_id={self.instructor_id}, title='{self.title}')>"
+        return f"<Instructor(instructor_id={self.instructor_id})>"

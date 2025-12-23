@@ -1,12 +1,13 @@
 """User schemas for request/response validation"""
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from app.schemas.base import CamelCaseModel
+from pydantic import EmailStr, Field, field_validator
 from datetime import datetime
 from typing import Optional
 import re
 
 
-class UserBase(BaseModel):
+class UserBase(CamelCaseModel):
     """Base user schema with common fields"""
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=100)
@@ -18,14 +19,11 @@ class UserCreate(UserBase):
     role: str = Field(..., pattern="^(student|instructor)$")
     
     # Student-specific fields (required if role=student)
-    student_number: Optional[str] = Field(None, min_length=1, max_length=20)
-    department: Optional[str] = Field(None, min_length=1, max_length=100)
-    class_level: Optional[int] = Field(None, ge=1, le=4)
-    enrollment_year: Optional[int] = Field(None, ge=1900, le=2100)
+    student_number: Optional[str] = Field(None, min_length=9, max_length=9, pattern=r"^\d{9}$")
+    # Removed: department, class_level, enrollment_year
     
     # Instructor-specific fields (optional if role=instructor)
-    title: Optional[str] = Field(None, max_length=50)
-    office_info: Optional[str] = Field(None, max_length=100)
+    # Removed: title, office_info
     
     @field_validator('password')
     @classmethod
@@ -48,9 +46,11 @@ class UserCreate(UserBase):
         return v.lower()
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(CamelCaseModel):
     """Schema for updating user profile"""
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    email: Optional[EmailStr] = None
+    password: Optional[str] = Field(None, min_length=8, max_length=100)
 
 
 class UserResponse(UserBase):
@@ -58,6 +58,7 @@ class UserResponse(UserBase):
     user_id: int
     role: str
     created_at: datetime
+    student_number: Optional[str] = None
     
     class Config:
         from_attributes = True
