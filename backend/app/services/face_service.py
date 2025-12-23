@@ -92,7 +92,7 @@ class FaceService:
                 img_path=image_array,
                 model_name=self.model_name,
                 detector_backend=self.detector_backend,
-                enforce_detection=True
+                enforce_detection=True  # Strict detection (mobile has retry loop)
             )
             
             # DeepFace.represent returns a list of dictionaries

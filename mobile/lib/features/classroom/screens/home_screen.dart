@@ -194,6 +194,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                                 ),
                               ),
                               const SizedBox(height: 4),
+                              if (classItem.semester != null && classItem.year != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4.0),
+                                  child: Text(
+                                    "${classItem.semester} ${classItem.year}",
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.grey[500],
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
                               Text(
                                 teacherName,
                                 style: theme.textTheme.bodyMedium?.copyWith(

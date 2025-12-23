@@ -101,6 +101,27 @@ class AttendanceController extends AsyncNotifier<void> {
       rethrow;
     }
   }
+
+  // New method: Face-only check-in (QR already validated)
+  Future<void> markAttendanceWithFace({
+    required String classId,
+    required String sessionId,
+    required File photo,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      // Send without QR code (already validated in previous step)
+      await ref.read(attendanceServiceProvider).joinAttendance(
+        sessionId, 
+        photo.path,
+        // No scannedCode parameter
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
 }
 
 final attendanceControllerProvider = AsyncNotifierProvider<AttendanceController, void>(() {

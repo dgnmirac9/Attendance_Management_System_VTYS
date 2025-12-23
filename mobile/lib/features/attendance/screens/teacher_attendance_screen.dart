@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import '../../../core/utils/snackbar_utils.dart'; // Assuming this exists or using ScaffoldMessenger directly if not
+import '../../../core/utils/snackbar_utils.dart';
 import '../../../core/services/attendance_service.dart';
 import '../providers/attendance_provider.dart';
 import '../../../core/widgets/empty_state_widget.dart';
@@ -34,11 +34,8 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
   @override
   void initState() {
     super.initState();
-    // İlk QR kodunu oluştur
     _generateNewQrCode();
     
-    // QR kodu güncelleme ve Polling için timer başlat
-    // 5 saniyede bir çalışacak
     _qrTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (!mounted) return;
       _generateNewQrCode();
@@ -63,8 +60,6 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
       _currentQrData = newCode;
     });
 
-    // API'yi güncelle (Arka planda, await etmiyoruz ki UI donmasın)
-    // Hata olursa kullanıcıya yansıtmak yerine logluyoruz, çünkü bu sık yapılan bir işlem
     try {
       ref.read(attendanceServiceProvider).updateSessionQrCode(
         widget.sessionId, 
@@ -77,8 +72,6 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
 
   void _pollAttendanceList() {
     if (!mounted) return;
-    // Listeyi yenilemek için provider'ı invalidate ediyoruz
-    // Bu işlem bir sonraki frame'de rebuild tetikler
     ref.invalidate(sessionAttendanceProvider(widget.sessionId));
   }
 
@@ -89,7 +82,7 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
         sessionId: widget.sessionId
       );
       if (mounted) {
-        Navigator.pop(context); // Ekranı kapat
+        Navigator.pop(context);
         SnackbarUtils.showSuccess(context, "Yoklama oturumu sonlandırıldı.");
       }
     } catch (e) {
@@ -118,7 +111,6 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    // Canlı katılımcıları izle
     final sessionAttendanceAsync = ref.watch(
       sessionAttendanceProvider(widget.sessionId),
     );
@@ -156,7 +148,6 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
           ),
           const SizedBox(height: 30),
           
-          // QR KOD ALANI
           Center(
             child: Container(
               padding: const EdgeInsets.all(20),
@@ -182,13 +173,11 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
           
           const SizedBox(height: 40),
           
-          // KATILIMCI LİSTESİ PANELİ
           sessionAttendanceAsync.when(
             data: (records) {
               return Expanded(
                 child: Column(
                   children: [
-                    // Başlık ve Sayı
                      Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: Row(
@@ -216,7 +205,6 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
                       ),
                     ),
                     const SizedBox(height: 10),
-                    // Liste
                     Expanded(
                       child: records.isEmpty
                           ? const EmptyStateWidget(

@@ -15,6 +15,7 @@ import '../../../core/services/announcement_service.dart'; // Add import
 import '../../../core/utils/snackbar_utils.dart';
 import '../../attendance/screens/teacher_attendance_screen.dart';
 import '../../attendance/providers/attendance_provider.dart';
+import '../../../core/services/attendance_service.dart';
 import 'dart:io';
 import '../../attendance/screens/qr_scanner_screen.dart';
 import '../../attendance/screens/camera_screen.dart';
@@ -272,6 +273,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
               ),
             ),
             
+            // --- ACTIVE SESSION CARD REMOVED ---
+
+
             // --- BODY (TABS) ---
             Expanded(
               child: Builder(
@@ -317,6 +321,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     );
   }
 
+
+
   Widget? _buildTeacherFab(BuildContext context, bool isTeacher) {
     // 1. TEACHER FAB
     if (isTeacher) {
@@ -359,77 +365,126 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
       return null;
     } 
     
-    // 2. STUDENT FAB (Listen to active sessions)
-    if (!isTeacher && _selectedIndex == 0) {
-      final activeSessionAsync = ref.watch(activeSessionProvider(widget.classId));
-      
-      return activeSessionAsync.when(
-        data: (sessionMap) {
-          if (sessionMap == null) return null; // No active session
-          
-          final sessionId = sessionMap['attendanceId'].toString();
-          
-          // Check if already attended?
-          final attendanceStatusAsync = ref.watch(userAttendanceStatusProvider(
-            (classId: widget.classId, sessionId: sessionId)
-          ));
-          
-          return attendanceStatusAsync.when(
-            data: (hasAttended) {
-              if (hasAttended) return null; // Already attended
-              
-              return FloatingActionButton(
-                onPressed: () => _handleStudentJoinAttendance(context, sessionId),
-                heroTag: 'join_attendance_fab',
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                child: const Icon(Icons.qr_code_scanner),
-              );
-            },
-            loading: () => null,
-            error: (_, __) => null,
-          );
-        },
-        loading: () => null,
-        error: (_, __) => null,
-      );
-    }
-
-    return null;
+  // 2. STUDENT FAB (Listen to active sessions)
+  if (!isTeacher && _selectedIndex == 0) {
+    final activeSessionAsync = ref.watch(activeSessionProvider(widget.classId));
+    
+    return activeSessionAsync.when(
+      data: (sessionMap) {
+        if (sessionMap == null) return null; // No active session
+        
+        final sessionId = sessionMap['attendanceId'].toString();
+        
+        // Check if already attended?
+        final attendanceStatusAsync = ref.watch(userAttendanceStatusProvider(
+          (classId: widget.classId, sessionId: sessionId)
+        ));
+        
+        return attendanceStatusAsync.when(
+          data: (hasAttended) {
+            if (hasAttended) return null; // Already attended
+            
+            return FloatingActionButton(
+              onPressed: () => _handleStudentJoinAttendance(context, sessionId),
+              heroTag: 'join_attendance_fab',
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              child: const Icon(Icons.qr_code_scanner),
+            );
+          },
+          loading: () => null,
+          error: (_, __) => null,
+        );
+      },
+      loading: () => null,
+      error: (_, __) => null,
+    );
   }
 
+  return null;
+}
+
   Future<void> _handleStudentJoinAttendance(BuildContext context, String sessionId) async {
-    // 1. Scan QR Code
+    // PHASE 1: Scan and Validate QR Code
     final scannedCode = await Navigator.push<String>(
       context, 
       MaterialPageRoute(builder: (context) => const QrScannerScreen()),
     );
 
-    if (scannedCode != null && context.mounted) {
-      // 2. Open Camera for Face Verification
-      final File? capturedPhoto = await Navigator.push<File>(
-        context,
-        MaterialPageRoute(builder: (context) => const CameraScreen()),
+    if (scannedCode == null || !context.mounted) return;
+
+    // Show loading while validating QR
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // Validate QR token with backend
+      final isValid = await ref.read(attendanceServiceProvider).validateQrToken(
+        sessionId: sessionId,
+        qrToken: scannedCode,
       );
 
-      if (capturedPhoto != null && context.mounted) {
-        try {
-          // 3. Submit Attendance with QR Code and Face Photo
-          await ref.read(attendanceControllerProvider.notifier).markAttendanceWithQrAndFace(
-            classId: widget.classId,
-            sessionId: sessionId,
-            scannedCode: scannedCode,
-            photo: capturedPhoto,
-          );
-          
-          if (context.mounted) {
-            SnackbarUtils.showSuccess(context, "Yoklamaya başarıyla katıldınız!");
-          }
-        } catch (e) {
-           if (context.mounted) {
-            SnackbarUtils.showError(context, "Hata: ${e.toString().replaceAll('Exception: ', '')}");
-          }
-        }
+      if (!context.mounted) return;
+      Navigator.of(context).pop(); // Close loading
+
+      if (!isValid['valid']) {
+        // QR is invalid, show error and stop
+        SnackbarUtils.showError(
+          context, 
+          isValid['error'] ?? 'Geçersiz QR kodu'
+        );
+        return;
+      }
+
+      // PHASE 2: Face Capture with In-Camera Processing
+      if (!context.mounted) return;
+      
+      await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CameraScreen(
+            onPhotoTaken: (File photo) async {
+              // This callback runs INSIDE camera screen
+              // Loading is shown in camera, errors displayed in camera
+              try {
+                await ref.read(attendanceControllerProvider.notifier).markAttendanceWithFace(
+                  classId: widget.classId,
+                  sessionId: sessionId,
+                  photo: photo,
+                );
+                
+                // Success! Show message in camera then close
+                if (context.mounted) {
+                  SnackbarUtils.showSuccess(context, "Yoklamaya başarıyla katıldınız!");
+                }
+                return true; // Camera will close
+                
+              } catch (e) {
+                // Error! Show message in camera, stay open for retry
+                if (context.mounted) {
+                  SnackbarUtils.showError(
+                    context,
+                    e.toString().replaceAll('Exception: ', '')
+                  );
+                }
+                return false; // Camera stays open for retry
+              }
+            },
+          ),
+        ),
+      );
+      
+      // Camera closed - either success or user pressed back
+      // No action needed here, camera handled everything
+
+      
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading
+        SnackbarUtils.showError(context, "Hata: ${e.toString()}");
       }
     }
   }
@@ -441,8 +496,12 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        return ref.refresh(classAnnouncementsProvider(widget.classId).future);
-      },
+      // Refresh both announcements and active session status
+      await Future.wait([
+        ref.refresh(classAnnouncementsProvider(widget.classId).future),
+        ref.refresh(activeSessionProvider(widget.classId).future),
+      ]);
+    },
       child: announcementsAsync.when(
         data: (announcements) {
           if (announcements.isEmpty) {

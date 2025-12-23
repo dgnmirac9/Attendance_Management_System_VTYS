@@ -6,6 +6,8 @@ class ClassModel {
   final String joinCode;
   final List<String> studentIds;
   final DateTime? createdAt;
+  final String? semester;
+  final int? year;
 
   ClassModel({
     required this.id,
@@ -15,6 +17,8 @@ class ClassModel {
     required this.joinCode,
     this.studentIds = const [],
     this.createdAt,
+    this.semester,
+    this.year,
   });
 
   factory ClassModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +33,8 @@ class ClassModel {
       createdAt: json['createdAt'] != null 
           ? DateTime.tryParse(json['createdAt']) 
           : (json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null),
+      semester: json['semester']?.toString(),
+      year: json['year'] != null ? int.tryParse(json['year'].toString()) : null,
     );
   }
 
@@ -41,6 +47,8 @@ class ClassModel {
       'join_code': joinCode,
       'student_ids': studentIds,
       'created_at': createdAt?.toIso8601String(),
+      'semester': semester,
+      'year': year,
     };
   }
 }

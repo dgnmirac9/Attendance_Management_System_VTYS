@@ -207,7 +207,9 @@ def get_courses(
                 "teacherId": course.instructor_id,
                 "teacherName": teacher_name,  # ADDED
                 "joinCode": course.join_code,
-                "studentIds": [],
+                "studentIds": [e.student_id for e in course.enrollments if e.enrollment_status == "active"],
+                "semester": course.semester,
+                "year": course.year,
                 "createdAt": course.created_at.isoformat() if course.created_at else None
             })
         

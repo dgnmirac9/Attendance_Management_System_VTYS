@@ -65,6 +65,18 @@ class FaceCheckInRequest(BaseModel):
     qr_token: Optional[str] = Field(None, description="QR Code token for verification")
 
 
+class QrTokenValidateRequest(BaseModel):
+    """QR token validation request"""
+    attendance_id: int = Field(..., description="Attendance session ID")
+    qr_token: str = Field(..., description="QR token to validate")
+
+
+class QrTokenValidateResponse(BaseModel):
+    """QR token validation response"""
+    valid: bool
+    error: Optional[str] = None
+
+
 class CheckInResponse(BaseModel):
     """Check-in response"""
     success: bool
@@ -352,6 +364,9 @@ def update_qr_code(
              raise HTTPException(status_code=403, detail="Not authorized")
              
         attendance.current_qr_token = qr_data.qr_code
+        # Set expiry time for the new QR token (30 seconds validity)
+        from datetime import datetime, timedelta
+        attendance.qr_token_expires_at = datetime.utcnow() + timedelta(seconds=30)
         db.commit()
         return {"success": True}
     except Exception as e:
@@ -448,6 +463,87 @@ def close_attendance_session(
 
 from fastapi import Form
 import json
+
+@router.post(
+    "/validate-qr",
+    response_model=QrTokenValidateResponse,
+    summary="Validate QR token",
+    description="""
+    Validate QR token before face check-in.
+    
+    **Flow:**
+    1. Student scans QR code
+    2. Send QR token to this endpoint for validation
+    3. If valid, proceed to face capture
+    4. If invalid, show error and stop
+    
+    **Requirements:**
+    - User must be authenticated
+    - User must be a student
+    - Session must be active
+    - QR token must match current token
+    - QR token must not be expired
+    """
+)
+def validate_qr_token(
+    request: QrTokenValidateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_sync)
+) -> QrTokenValidateResponse:
+    """Validate QR token for attendance check-in"""
+    try:
+        # Get student profile
+        student = user_service.get_student_profile_sync(db, current_user.user_id)
+        if not student:
+            return QrTokenValidateResponse(
+                valid=False,
+                error="Student profile not found"
+            )
+        
+        # Get attendance session
+        attendance_service = AttendanceService(db)
+        attendance = attendance_service.get_attendance_session(request.attendance_id)
+        
+        if not attendance:
+            return QrTokenValidateResponse(
+                valid=False,
+                error="Attendance session not found"
+            )
+        
+        # Check if session is active
+        from datetime import datetime
+        current_time = datetime.utcnow()
+        if not attendance.is_active or current_time > attendance.end_time:
+            return QrTokenValidateResponse(
+                valid=False,
+                error="Attendance session is closed"
+            )
+        
+        # Validate QR token
+        if attendance.current_qr_token:
+            # Check if token matches
+            if request.qr_token != attendance.current_qr_token:
+                return QrTokenValidateResponse(
+                    valid=False,
+                    error="Invalid QR token"
+                )
+            
+            # Check if token is expired
+            if attendance.qr_token_expires_at and current_time > attendance.qr_token_expires_at:
+                return QrTokenValidateResponse(
+                    valid=False,
+                    error="QR token expired"
+                )
+        
+        # All checks passed
+        return QrTokenValidateResponse(valid=True)
+        
+    except Exception as e:
+        return QrTokenValidateResponse(
+            valid=False,
+            error=f"Validation failed: {str(e)}"
+        )
+
 
 @router.post(
     "/check-in",
@@ -817,6 +913,7 @@ def get_mobile_course_sessions(
             session_data = {
                 "attendanceId": session.attendance_id,
                 "startTime": session.start_time.isoformat(),
+                "endTime": session.end_time.isoformat() if session.end_time else None,
                 "sessionName": session.session_name,
                 "attendeeCount": attendee_count,
                 "isActive": session.is_active,

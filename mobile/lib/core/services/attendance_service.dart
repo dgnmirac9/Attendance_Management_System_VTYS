@@ -64,7 +64,36 @@ class AttendanceService {
   Future<List<Map<String, dynamic>>> getAttendanceHistory(String classId) async {
     try {
       final response = await _apiClient.get('/attendance/mobile/course/$classId/sessions');
-      return List<Map<String, dynamic>>.from(response.data);
+      final allSessions = List<Map<String, dynamic>>.from(response.data);
+      
+      // Filter active sessions out of history
+      // Logic: Show in history if (isActive == false) OR (isActive == true but expired)
+      final nowUtc = DateTime.now().toUtc();
+      
+      return allSessions.where((session) {
+        final isActive = session['isActive'] == true || session['is_active'] == true;
+        
+        if (!isActive) return true; // Already closed, show in history
+        
+        // If active, check if expired
+        final endTimeStr = session['endTime'] ?? session['end_time'];
+        if (endTimeStr != null) {
+          try {
+             var endTime = DateTime.parse(endTimeStr);
+             if (!endTimeStr.endsWith('Z') && !endTimeStr.contains('+')) {
+                 endTime = DateTime.parse('${endTimeStr}Z');
+             }
+             // active & not expired = ACTIVE session (Hide from history)
+             // active & expired = EXPIRED session (Show in history)
+             return nowUtc.isAfter(endTime);
+          } catch (e) {
+            return true; // Parse error, show in history to be safe
+          }
+        }
+        
+        // Active but no end time? Treat as active (Hide from history)
+        return false;
+      }).toList();
     } on DioException catch (e) {
       throw e.response?.data['message'] ?? 'Yoklama geçmişi alınamadı.';
     }
@@ -75,14 +104,77 @@ class AttendanceService {
       final response = await _apiClient.get('/attendance/mobile/course/$classId/sessions');
       final sessions = List<Map<String, dynamic>>.from(response.data);
       
+      debugPrint('getActiveSession: Found ${sessions.length} sessions for class $classId');
+      
+      final nowUtc = DateTime.now().toUtc();
+      
       for (var session in sessions) {
-        if (session['isActive'] == true || session['is_active'] == true) {
-          return session;
+        final isActive = session['isActive'] == true || session['is_active'] == true;
+        final sessionId = session['id'] ?? session['attendance_id'];
+        
+        debugPrint('Checking Session $sessionId: isActive=$isActive');
+        
+        if (isActive) {
+          // Also check if session hasn't expired
+          final endTimeStr = session['endTime'] ?? session['end_time'];
+          if (endTimeStr != null) {
+            try {
+              var endTime = DateTime.parse(endTimeStr);
+              // Backend sends UTC but without 'Z' usually. 
+              // If parsed as local, it disrupts comparison. 
+              // Force it to be treated as UTC if it doesn't have timezone info
+              if (!endTimeStr.endsWith('Z') && !endTimeStr.contains('+')) {
+                 endTime = DateTime.parse('${endTimeStr}Z');
+              }
+              
+              debugPrint('  Now(UTC): $nowUtc');
+              debugPrint('  End(UTC): $endTime');
+              debugPrint('  isBefore: ${nowUtc.isBefore(endTime)}');
+              
+              // Session is truly active if is_active=true AND current time < end_time
+              if (nowUtc.isBefore(endTime)) {
+                return session;
+              } else {
+                 debugPrint('  Session expired!');
+              }
+            } catch (e) {
+              debugPrint('  Date parse error: $e');
+              continue;
+            }
+          } else {
+             // No end time, assume active
+             debugPrint('  No end time, assuming active');
+             return session;
+          }
         }
       }
+      debugPrint('No active session found matching criteria.');
       return null;
     } catch (e) {
-       return null;
+      debugPrint('ERROR in getActiveSession: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>> validateQrToken({
+    required String sessionId,
+    required String qrToken,
+  }) async {
+    try {
+      final response = await _apiClient.post('/attendance/validate-qr', data: {
+        'attendance_id': int.parse(sessionId),
+        'qr_token': qrToken,
+      });
+      
+      return {
+        'valid': response.data['valid'] ?? false,
+        'error': response.data['error'],
+      };
+    } on DioException catch (e) {
+      return {
+        'valid': false,
+        'error': e.response?.data['detail'] ?? e.response?.data['message'] ?? 'QR doğrulama başarısız',
+      };
     }
   }
 

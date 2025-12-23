@@ -50,7 +50,7 @@ class AuthController extends StateNotifier<AsyncValue<UserModel?>> {
   }) async {
     // Note: We don't set global loading here to prevent AuthWrapper from unmounting RegisterScreen
     try {
-      final user = await _authService.register(
+      await _authService.register(
         email: email,
         password: password,
         role: role,
@@ -59,8 +59,9 @@ class AuthController extends StateNotifier<AsyncValue<UserModel?>> {
         studentNo: studentNo,
         faceImagePath: faceImagePath,
       );
-      // Auto login handling (token is already saved in register)
-      state = AsyncValue.data(user);
+      // Don't auto-login! Keep state as null so user is redirected to login screen
+      // User must manually login with their new credentials
+      state = const AsyncValue.data(null);
     } catch (e) {
       // Revert to unauthenticated state on error, allow UI to handle the exception
       state = const AsyncValue.data(null);

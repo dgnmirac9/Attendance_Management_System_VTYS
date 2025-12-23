@@ -21,7 +21,9 @@ from app.core.exceptions import (
     DuplicateAttendanceError,
     FaceVerificationError,
     AppException,
-    AttendanceNotFoundError
+    AttendanceNotFoundError,
+    AttendanceSessionClosedError,
+    StudentNotEnrolledError
 )
 
 
@@ -73,8 +75,8 @@ class AttendanceService:
         
         # Yoklama oturumu oluştur
         if duration_minutes is None:
-            # Unlimited duration - set a far future date
-            end_time = datetime.utcnow() + timedelta(days=365)
+            # Default duration: 24 hours (effectively manual close only)
+            end_time = datetime.utcnow() + timedelta(hours=24)
         else:
             end_time = datetime.utcnow() + timedelta(minutes=duration_minutes)
         
@@ -232,19 +234,18 @@ class AttendanceService:
         
         # Oturum aktif mi kontrol et
         current_time = datetime.utcnow()
+        print(f"=== ATTENDANCE SESSION CHECK ===")
+        print(f"Session ID: {attendance_id}")
+        print(f"is_active: {attendance.is_active}")
+        print(f"current_time: {current_time}")
+        print(f"end_time: {attendance.end_time}")
+        print(f"Time comparison (current > end): {current_time > attendance.end_time}")
+        print(f"================================")
         if not attendance.is_active or current_time > attendance.end_time:
             raise AttendanceSessionClosedError("Attendance session is closed")
-            
-        # QR Token verification
-        if attendance.current_qr_token:
-            if not qr_token:
-                 raise AppException(message="QR token required", status_code=400)
-            
-            if qr_token != attendance.current_qr_token:
-                 raise AppException(message="Invalid QR token", status_code=400)
-            
-            if attendance.qr_token_expires_at and current_time > attendance.qr_token_expires_at:
-                 raise AppException(message="QR token expired", status_code=400)
+        
+        # NOTE: QR token validation is now done in /validate-qr endpoint BEFORE face capture
+        # No need to validate again here
         
         # Öğrencinin derse kayıtlı olup olmadığını kontrol et
         enrollment = self.db.query(CourseEnrollment).filter(
@@ -500,7 +501,7 @@ class AttendanceService:
         import secrets
         token = secrets.token_urlsafe(16)
         attendance.current_qr_token = token
-        attendance.qr_token_expires_at = datetime.utcnow() + timedelta(seconds=10)
+        attendance.qr_token_expires_at = datetime.utcnow() + timedelta(seconds=30)
         
         self.db.commit()
         
