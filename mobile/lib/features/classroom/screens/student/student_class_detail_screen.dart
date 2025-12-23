@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:attendance_management_system_vtys/features/auth/services/user_service.dart';
 import 'package:attendance_management_system_vtys/features/auth/screens/student_profile_screen.dart';
 import 'package:attendance_management_system_vtys/features/attendance/providers/attendance_provider.dart';
@@ -11,11 +12,13 @@ import 'package:attendance_management_system_vtys/features/classroom/screens/doc
 class StudentClassDetailScreen extends ConsumerWidget {
   final String className;
   final String classId;
+  final String teacherName;
 
   const StudentClassDetailScreen({
     super.key,
     required this.className,
     required this.classId,
+    this.teacherName = 'Akademisyen',
   });
 
   @override
@@ -25,208 +28,366 @@ class StudentClassDetailScreen extends ConsumerWidget {
     final isLoading = controllerState.isLoading;
 
     return Scaffold(
-      appBar: AppBar(title: Text(className)),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            activeSessionAsync.when(
-              data: (snapshot) {
-                final hasActiveSession = snapshot.docs.isNotEmpty;
-                final activeSessionId = hasActiveSession ? snapshot.docs.first.id : null;
-
-                if (!hasActiveSession) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: Text('Ders Detayı', style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DocumentsScreen(
+                classId: classId,
+                isAcademic: false,
+              ),
+            ),
+          );
+        },
+        backgroundColor: const Color(0xFF2979FF),
+        icon: const Icon(Icons.folder_open, color: Colors.white),
+        label: Text('Ders Dokümanları', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1A237E), // Koyu Lacivert
+              Color(0xFF0D47A1),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Header Kartı
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2979FF), Color(0xFF6200EA)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2979FF).withOpacity(0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      FilledButton.icon(
-                        onPressed: null,
-                        icon: const Icon(Icons.camera_alt),
-                        label: const Text('Aktif Yoklama Yok'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.grey,
-                          disabledBackgroundColor: Colors.grey.shade300,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      Text(
+                        className,
+                        style: GoogleFonts.poppins(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DocumentsScreen(
-                                classId: classId,
-                                isAcademic: false,
-                              ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.person, color: Colors.white70, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            teacherName,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              color: Colors.white70,
                             ),
-                          );
-                        },
-                        icon: const Icon(Icons.folder),
-                        label: const Text('Ders Dokümanları'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Aktif Dönem',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
-                  );
-                }
+                  ),
+                ),
+              ),
 
-                // Watch attendance status for the active session
-                final attendanceStatusAsync = ref.watch(
-                  userAttendanceStatusProvider((classId: classId, sessionId: activeSessionId!)),
-                );
+              // 2. Yoklama Durumu (Active Session Check)
+              activeSessionAsync.when(
+                data: (snapshot) {
+                  final hasActiveSession = snapshot.docs.isNotEmpty;
+                  final activeSessionId = hasActiveSession ? snapshot.docs.first.id : null;
 
-                return attendanceStatusAsync.when(
-                  data: (hasAttended) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        FilledButton.icon(
-                          onPressed: !hasAttended && !isLoading
-                              ? () async {
-                                  // GUARD CLAUSE: Check for face registration
-                                  final user = FirebaseAuth.instance.currentUser;
-                                  if (user != null) {
-                                    final userDetails = await UserService().getUserDetails(user.uid);
-                                    if (userDetails?.faceEmbedding == null || userDetails!.faceEmbedding!.isEmpty) {
-                                      if (context.mounted) {
-                                        showDialog(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text('Yüz Kaydı Bulunamadı'),
-                                            content: const Text('Yoklamaya katılmak için önce profil sayfasından yüzünüzü tanıtmalısınız.'),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(context),
-                                                child: const Text('İptal'),
-                                              ),
-                                              FilledButton(
-                                                onPressed: () {
-                                                  Navigator.pop(context); // Close dialog
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (context) => const StudentProfileScreen(),
-                                                    ),
-                                                  );
-                                                },
-                                                child: const Text('Profile Git'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }
-                                      return;
-                                    }
-                                  }
-
-                                  final photoFile = await Navigator.push<File>(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const CameraScreen(),
-                                    ),
-                                  );
-
-                                  if (photoFile != null && context.mounted) {
-                                    try {
-                                      await ref
-                                          .read(attendanceControllerProvider.notifier)
-                                          .markAttendance(
-                                            classId: classId,
-                                            sessionId: activeSessionId,
-                                            photo: photoFile,
-                                          );
-                                      
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Yoklamanız başarıyla alındı!'),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Hata: $e'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  }
-                                }
-                              : null,
-                          icon: hasAttended 
-                              ? const Icon(Icons.check_circle) 
-                              : (isLoading
-                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                  : const Icon(Icons.camera_alt)),
-                          label: Text(hasAttended 
-                              ? 'Katıldınız' 
-                              : (isLoading ? 'İşleniyor...' : 'YOKLAMAYA KATIL')),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: hasAttended ? Colors.grey : Colors.green,
-                            disabledBackgroundColor: Colors.grey.shade300,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
+                  if (!hasActiveSession) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.white.withOpacity(0.1)),
                         ),
-                        const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => DocumentsScreen(
-                                  classId: classId,
-                                  isAcademic: false,
+                        child: Row(
+                          children: [
+                             Icon(Icons.event_busy, color: Colors.white.withOpacity(0.5)),
+                             const SizedBox(width: 16),
+                             Text(
+                               'Şu an aktif bir yoklama yok',
+                               style: GoogleFonts.poppins(color: Colors.white70),
+                             ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  // Watch attendance status for the active session
+                  final attendanceStatusAsync = ref.watch(
+                    userAttendanceStatusProvider((classId: classId, sessionId: activeSessionId!)),
+                  );
+
+                  return attendanceStatusAsync.when(
+                    data: (hasAttended) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: hasAttended 
+                                        ? const Color(0xFF00E676).withOpacity(0.3) 
+                                        : const Color(0xFF2979FF).withOpacity(0.3),
+                                    blurRadius: 10,
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton.icon(
+                                onPressed: !hasAttended && !isLoading
+                                    ? () async {
+                                        // Face Check Logic
+                                        final user = FirebaseAuth.instance.currentUser;
+                                        if (user != null) {
+                                          final userDetails = await UserService().getUserDetails(user.uid);
+                                          if (userDetails?.faceEmbedding == null || userDetails!.faceEmbedding!.isEmpty) {
+                                            if (context.mounted) {
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => _buildFaceAlert(context),
+                                              );
+                                            }
+                                            return;
+                                          }
+                                        }
+
+                                        final photoFile = await Navigator.push<File>(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => const CameraScreen(),
+                                          ),
+                                        );
+
+                                        if (photoFile != null && context.mounted) {
+                                          try {
+                                            await ref
+                                                .read(attendanceControllerProvider.notifier)
+                                                .markAttendance(
+                                                  classId: classId,
+                                                  sessionId: activeSessionId,
+                                                  photo: photoFile,
+                                                );
+                                            
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('Yoklamanız alındı!', style: GoogleFonts.poppins()),
+                                                  backgroundColor: Colors.green,
+                                                  behavior: SnackBarBehavior.floating,
+                                                ),
+                                              );
+                                            }
+                                          } catch (e) {
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('Hata: $e', style: GoogleFonts.poppins()),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        }
+                                      }
+                                    : null,
+                                icon: hasAttended 
+                                    ? const Icon(Icons.check_circle, color: Colors.white) 
+                                    : (isLoading
+                                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                        : const Icon(Icons.face_retouching_natural, color: Colors.white)),
+                                label: Text(
+                                  hasAttended ? 'KATILDINIZ' : (isLoading ? 'İŞLENİYOR...' : 'YOKLAMAYA KATIL'),
+                                  style: GoogleFonts.orbitron(
+                                    fontSize: 16, 
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: hasAttended ? const Color(0xFF00E676) : const Color(0xFF2979FF),
+                                  disabledBackgroundColor: Colors.grey.shade700,
+                                  padding: const EdgeInsets.symmetric(vertical: 20),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                 ),
                               ),
-                            );
-                          },
-                          icon: const Icon(Icons.folder),
-                          label: const Text('Ders Dokümanları'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    );
-                  },
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, s) => Center(child: Text('Hata: $e')),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, s) => Center(child: Text('Hata: $e')),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Geçmiş Yoklamalarım',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                itemCount: 3, // Mock count
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    leading: const Icon(Icons.check, color: Colors.green),
-                    title: Text('Hafta ${index + 1}'),
-                    subtitle: Text('2${index + 1}.11.2025'),
-                    trailing: const Text('Var'),
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
+                    error: (e, s) => Center(child: Text('Hata: $e', style: const TextStyle(color: Colors.white))),
                   );
                 },
+                loading: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
+                error: (e, s) => Center(child: Text('Hata: $e', style: const TextStyle(color: Colors.white))),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 30),
+
+              // 3. Geçmiş Yoklamalar Listesi
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  'Yoklama Geçmişi',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18, 
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: 3, // Mock data
+                  itemBuilder: (context, index) {
+                    final isPresent = index != 1; // Mock: 2nd item is absent
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.calendar_today,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                        title: Text(
+                          'Hafta ${3 - index}',
+                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '${20 - index}.12.2025',
+                          style: GoogleFonts.poppins(color: Colors.white54),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isPresent 
+                                ? const Color(0xFF00E676).withOpacity(0.2) 
+                                : const Color(0xFFFF1744).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isPresent ? const Color(0xFF00E676) : const Color(0xFFFF1744),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isPresent 
+                                    ? const Color(0xFF00E676).withOpacity(0.4) 
+                                    : const Color(0xFFFF1744).withOpacity(0.4),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            isPresent ? 'VAR' : 'YOK',
+                            style: GoogleFonts.orbitron(
+                              color: isPresent ? const Color(0xFF00E676) : const Color(0xFFFF1744),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildFaceAlert(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1A237E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text('Yüz Kaydı Gerekiyor', style: GoogleFonts.poppins(color: Colors.white)),
+      content: Text(
+        'Yoklamaya katılabilmek için önce profil sayfasından yüzünüzü sisteme tanıtmalısınız.',
+        style: GoogleFonts.poppins(color: Colors.white70),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('İptal', style: GoogleFonts.poppins(color: Colors.white54)),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const StudentProfileScreen(),
+              ),
+            );
+          },
+          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2979FF)),
+          child: Text('Profile Git', style: GoogleFonts.poppins()),
+        ),
+      ],
     );
   }
 }

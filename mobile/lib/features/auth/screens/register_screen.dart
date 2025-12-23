@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_controller.dart';
-import '../../classroom/screens/home_screen.dart';
+// import '../../classroom/screens/home_screen.dart'; // Unused import removal
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -17,7 +18,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   
-  Set<String> _selectedRole = {'student'};
+  // Using a single string instead of Set for simpler Toggle logic, initializing with 'student'
+  String _selectedRole = 'student';
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -35,7 +38,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             _studentIdController.text,
             _emailController.text,
             _passwordController.text,
-            _selectedRole.first,
+            _selectedRole,
           );
     }
   }
@@ -47,8 +50,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         error: (error, stackTrace) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(error.toString()),
-              backgroundColor: Colors.red,
+              content: Text(error.toString(), style: GoogleFonts.poppins()),
+              backgroundColor: Colors.red.shade900,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           );
         },
@@ -59,121 +64,268 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final isLoading = authState.isLoading;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Kayıt Ol')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1A237E), // Koyu Lacivert
+              Color(0xFF0D47A1),
+            ],
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(
-                      value: 'student',
-                      label: Text('Öğrenci'),
-                      icon: Icon(Icons.school),
-                    ),
-                    ButtonSegment(
-                      value: 'academician',
-                      label: Text('Akademisyen'),
-                      icon: Icon(Icons.person),
-                    ),
-                  ],
-                  selected: _selectedRole,
-                  onSelectionChanged: (Set<String> newSelection) {
-                    setState(() {
-                      _selectedRole = newSelection;
-                    });
-                  },
+                Text(
+                  'Hesap Oluştur',
+                  style: GoogleFonts.orbitron(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 1.5,
+                  ),
                 ),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Ad Soyad',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person_outline),
+                const SizedBox(height: 40),
+                
+                // GLASS CARD
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Lütfen adınızı giriniz';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                if (_selectedRole.contains('student')) ...[
-                  TextFormField(
-                    controller: _studentIdController,
-                    decoration: const InputDecoration(
-                      labelText: 'Öğrenci No',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.badge),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Lütfen öğrenci numaranızı giriniz';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'E-posta',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Lütfen e-posta giriniz';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Şifre',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Lütfen şifre giriniz';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 32),
-                FilledButton(
-                  onPressed: isLoading ? null : _register,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // ROLE TOGGLE
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(30),
                           ),
-                        )
-                      : const Text('Kayıt Ol', style: TextStyle(fontSize: 16)),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _selectedRole = 'student'),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 300),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: _selectedRole == 'student' 
+                                          ? const Color(0xFF2979FF) 
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(25),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Öğrenci',
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.white,
+                                          fontWeight: _selectedRole == 'student' ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _selectedRole = 'academician'),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 300),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: _selectedRole == 'academician' 
+                                          ? const Color(0xFF00E5FF) 
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(25),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Akademisyen',
+                                        style: GoogleFonts.poppins(
+                                          color: _selectedRole == 'academician' ? Colors.black : Colors.white,
+                                          fontWeight: _selectedRole == 'academician' ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // INPUTS
+                        _buildInputField(
+                          controller: _nameController,
+                          label: 'Ad Soyad',
+                          icon: Icons.person_outline,
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        if (_selectedRole == 'student') ...[
+                          _buildInputField(
+                            controller: _studentIdController,
+                            label: 'Öğrenci No',
+                            icon: Icons.badge_outlined,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        _buildInputField(
+                          controller: _emailController,
+                          label: 'E-posta',
+                          icon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 16),
+
+                        _buildInputField(
+                          controller: _passwordController,
+                          label: 'Şifre',
+                          icon: Icons.lock_outline,
+                          isPassword: true,
+                        ),
+                        const SizedBox(height: 32),
+
+                        // BUTTON
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: isLoading ? null : _register,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2979FF),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: const StadiumBorder(),
+                              elevation: 8,
+                              shadowColor: const Color(0xFF2979FF).withOpacity(0.5),
+                            ),
+                            child: isLoading
+                                ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  )
+                                : Text(
+                                    'KAYIT OL',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // FOOTER
+                const SizedBox(height: 24),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: RichText(
+                    text: TextSpan(
+                      text: 'Zaten hesabın var mı? ',
+                      style: GoogleFonts.poppins(color: Colors.white70),
+                      children: [
+                        TextSpan(
+                          text: 'Giriş Yap',
+                          style: GoogleFonts.poppins(
+                            color: const Color(0xFF00E5FF),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
+    TextInputType? keyboardType,
+  }) {
+    return TextFormField(
+      controller: controller,
+      style: GoogleFonts.poppins(color: Colors.white),
+      obscureText: isPassword ? _obscurePassword : false,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.poppins(color: Colors.white70),
+        prefixIcon: Icon(icon, color: Colors.white70),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  color: Colors.white70,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              )
+            : null,
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF2979FF)),
+        ),
+        errorStyle: GoogleFonts.poppins(color: const Color(0xFFFF5252)),
+      ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return '$label gerekli';
+        }
+        return null;
+      },
     );
   }
 }

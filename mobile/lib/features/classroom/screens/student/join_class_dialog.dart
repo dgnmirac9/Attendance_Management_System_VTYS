@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../providers/classroom_provider.dart';
 
 class JoinClassDialog extends ConsumerStatefulWidget {
@@ -36,7 +37,6 @@ class _JoinClassDialogState extends ConsumerState<JoinClassDialog> {
         }
       } catch (e) {
         if (mounted) {
-          // Extract message from Exception if possible
           final message = e.toString().replaceAll('Exception: ', '');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -54,33 +54,97 @@ class _JoinClassDialogState extends ConsumerState<JoinClassDialog> {
     final state = ref.watch(classroomControllerProvider);
     final isLoading = state.isLoading;
 
-    return AlertDialog(
-      title: const Text('Derse Katıl'),
-      content: Form(
-        key: _formKey,
-        child: TextFormField(
-          controller: _codeController,
-          decoration: const InputDecoration(
-            labelText: 'Ders Kodu',
-            hintText: 'Örn: X9A2B1',
-            border: OutlineInputBorder(),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A237E), // Dark Navy
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF00E676), width: 2), // Neon Green Border
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00E676).withOpacity(0.3),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'DERSE KATIL',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Form(
+                key: _formKey,
+                child: TextFormField(
+                  controller: _codeController,
+                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                  textAlign: TextAlign.center,
+                  decoration: InputDecoration(
+                    labelText: 'DERS KODU',
+                    hintText: 'X9A2B1',
+                    labelStyle: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.transparent)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00E676))),
+                    prefixIcon: const Icon(Icons.vpn_key, color: Color(0xFF00E676)),
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                  validator: (value) => value == null || value.isEmpty ? 'Kod gerekli' : null,
+                ),
+              ),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: Text('İptal', style: GoogleFonts.poppins()),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: isLoading ? null : _joinClass,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00E676),
+                        foregroundColor: const Color(0xFF1A237E), // Dark Text on Green
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: const StadiumBorder(),
+                        elevation: 5,
+                        shadowColor: const Color(0xFF00E676).withOpacity(0.5),
+                      ),
+                      child: isLoading
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Color(0xFF1A237E), strokeWidth: 2))
+                          : Text('KATIL', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          textCapitalization: TextCapitalization.characters,
-          validator: (value) => value == null || value.isEmpty ? 'Kod gerekli' : null,
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('İptal'),
-        ),
-        ElevatedButton(
-          onPressed: isLoading ? null : _joinClass,
-          child: isLoading
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Katıl'),
-        ),
-      ],
     );
   }
 }

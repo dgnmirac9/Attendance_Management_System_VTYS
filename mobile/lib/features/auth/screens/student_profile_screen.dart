@@ -40,55 +40,18 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // 1. Take Photo
-    final photoFile = await Navigator.push<File>(
+    // Call Camera Screen in Registration Mode
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => const CameraScreen(),
+        builder: (context) => const CameraScreen(isRegistration: true),
       ),
     );
 
-    if (photoFile == null) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // 2. Detect Face
-      final inputImage = InputImage.fromFile(photoFile);
-      final faceDetector = FaceDetector(options: FaceDetectorOptions());
-      final faces = await faceDetector.processImage(inputImage);
-      await faceDetector.close();
-
-      if (faces.isEmpty) {
-        throw Exception("Fotoğrafta yüz bulunamadı! Lütfen yüzünüzü net bir şekilde gösterin.");
-      }
-
-      // 3. Generate Embedding
-      final embedding = await FaceRecognitionService.instance.generateEmbedding(photoFile, faces.first);
-
-      // 4. Save to Firestore
-      await UserService().saveFaceEmbedding(user.uid, embedding);
-
+    if (result == true) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Yüzünüz başarıyla sisteme tanımlandı'), backgroundColor: Colors.green),
-        );
         setState(() {
           _hasFaceRegistered = true;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
         });
       }
     }
