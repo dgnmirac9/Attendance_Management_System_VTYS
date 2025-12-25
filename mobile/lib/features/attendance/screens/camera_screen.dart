@@ -5,7 +5,12 @@ import '../../../core/utils/snackbar_utils.dart';
 import '../../../core/widgets/custom_transparent_appbar.dart';
 
 class CameraScreen extends StatefulWidget {
-  const CameraScreen({super.key});
+  // Optional callback for processing photo in-screen
+  // If provided: photo processed here with loading/retry
+  // If null: photo returned to caller (backward compatible)
+  final Future<bool> Function(File photo)? onPhotoTaken;
+  
+  const CameraScreen({super.key, this.onPhotoTaken});
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -31,7 +36,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
     _controller = CameraController(
       firstCamera,
-      ResolutionPreset.medium,
+      ResolutionPreset.veryHigh,
       enableAudio: false,
     );
 
@@ -56,8 +61,29 @@ class _CameraScreenState extends State<CameraScreen> {
 
     try {
       final image = await _controller!.takePicture();
-      if (mounted) {
-        Navigator.pop(context, File(image.path));
+      final photoFile = File(image.path);
+      
+      if (widget.onPhotoTaken != null) {
+        // Process in-screen with callback
+        final success = await widget.onPhotoTaken!(photoFile);
+        
+        if (!mounted) return;
+        
+        if (success) {
+          // Success! Close camera and return to class screen
+          Navigator.pop(context, true);
+        } else {
+          // Failed! Stay in camera, allow retry
+          setState(() {
+            _isProcessing = false;
+          });
+          // Error message shown by callback
+        }
+      } else {
+        // Legacy behavior: return file to caller
+        if (mounted) {
+          Navigator.pop(context, photoFile);
+        }
       }
     } catch (e) {
       debugPrint('Camera error: $e');
@@ -124,8 +150,11 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
 
                 if (_isProcessing)
-                  const Center(
-                    child: CircularProgressIndicator(),
+                  Container(
+                    color: Colors.black54,
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
                   ),
               ],
             );

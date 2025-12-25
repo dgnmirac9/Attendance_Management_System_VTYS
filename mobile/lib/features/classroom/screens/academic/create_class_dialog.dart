@@ -12,12 +12,13 @@ class CreateClassDialog extends ConsumerStatefulWidget {
 class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
   final _formKey = GlobalKey<FormState>();
   final _classNameController = TextEditingController();
-  final _teacherNameController = TextEditingController();
+  String? _selectedSemester;
+
+  final List<String> _semesters = ['Güz', 'Bahar', 'Yaz'];
 
   @override
   void dispose() {
     _classNameController.dispose();
-    _teacherNameController.dispose();
     super.dispose();
   }
 
@@ -25,8 +26,8 @@ class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
     if (_formKey.currentState!.validate()) {
       try {
         await ref.read(classroomControllerProvider.notifier).createClass(
-          className: _classNameController.text.trim(),
-          teacherName: _teacherNameController.text.trim(),
+          courseName: _classNameController.text.trim(),
+          semester: _selectedSemester!,
         );
         if (mounted) {
           Navigator.of(context).pop();
@@ -62,10 +63,12 @@ class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
               validator: (value) => value == null || value.isEmpty ? 'Ders adı gerekli' : null,
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _teacherNameController,
-              decoration: const InputDecoration(labelText: 'Öğretim Görevlisi Adı'),
-              validator: (value) => value == null || value.isEmpty ? 'İsim gerekli' : null,
+            DropdownButtonFormField<String>(
+              initialValue: _selectedSemester,
+              decoration: const InputDecoration(labelText: 'Dönem'),
+              items: _semesters.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              validator: (value) => value == null ? 'Dönem seçiniz' : null,
+              onChanged: (value) => setState(() => _selectedSemester = value),
             ),
           ],
         ),

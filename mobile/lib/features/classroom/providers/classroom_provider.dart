@@ -1,43 +1,38 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../services/classroom_service.dart';
+import '../../../core/services/course_service.dart';
 import '../../auth/providers/auth_controller.dart';
 import '../models/class_model.dart';
 
-final classroomServiceProvider = Provider<ClassroomService>((ref) {
-  return ClassroomService();
-});
-
-final userClassesProvider = StreamProvider<List<ClassModel>>((ref) {
-  final user = ref.watch(authStateChangesProvider).value;
-  final roleAsync = ref.watch(userRoleProvider);
-
-  if (user == null || !roleAsync.hasValue || roleAsync.value == null) {
-    return const Stream.empty();
+// Provides the list of courses for the current user (Future-based)
+// FIXED: Removed autoDispose to prevent "Cannot use ref after disposed" errors
+final userClassesFutureProvider = FutureProvider<List<ClassModel>>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) {
+    return [];
   }
-
-  final service = ref.watch(classroomServiceProvider);
-  return service.getUserClasses(user.uid, roleAsync.value!);
+  return ref.watch(courseServiceProvider).getCourses();
 });
 
 class ClassroomController extends AsyncNotifier<void> {
   @override
   FutureOr<void> build() {
-    // No initial state to load
+    // No initial state
   }
 
-  Future<void> createClass({required String className, required String teacherName}) async {
+  Future<void> createClass({required String courseName, required String semester}) async {
     state = const AsyncValue.loading();
     try {
-      final user = ref.read(authStateChangesProvider).value;
+      final user = ref.read(currentUserProvider);
       if (user == null) throw Exception("Kullanıcı oturumu açık değil");
+
       
-      await ref.read(classroomServiceProvider).createClass(
-        className: className,
-        teacherId: user.uid,
-        teacherName: teacherName,
-      );
+      await ref.read(courseServiceProvider).createCourse(courseName, semester);
+      
+      // Invalidate list to refresh
+      ref.invalidate(userClassesFutureProvider);
+      
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -48,13 +43,11 @@ class ClassroomController extends AsyncNotifier<void> {
   Future<void> joinClass({required String joinCode}) async {
     state = const AsyncValue.loading();
     try {
-      final user = ref.read(authStateChangesProvider).value;
-      if (user == null) throw Exception("Kullanıcı oturumu açık değil");
+      await ref.read(courseServiceProvider).joinCourse(joinCode);
+      
+      // Refresh list
+      ref.invalidate(userClassesFutureProvider);
 
-      await ref.read(classroomServiceProvider).joinClass(
-        joinCode: joinCode,
-        studentId: user.uid,
-      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

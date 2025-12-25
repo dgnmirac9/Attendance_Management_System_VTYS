@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class UserModel {
   final String uid;
   final String name;
@@ -23,30 +21,53 @@ class UserModel {
     this.createdAt,
   });
 
-  factory UserModel.fromMap(Map<String, dynamic> data, String uid) {
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    // Handle backend response format compatibility (Prioritize camelCase)
+    final userId = json['userId'] ?? json['user_id'] ?? json['uid'];
+    final name = json['fullName'] ?? json['full_name'] ?? json['name'];
+    final studentNumber = json['studentNumber'] ?? json['student_number'] ?? json['student_no'];
+    
+    // Attempt to split full_name if first/last are missing
+    String? fName = json['first_name'];
+    String? lName = json['last_name'];
+    
+    if ((fName == null || lName == null) && name != null) {
+      final parts = (name as String).split(' ');
+      if (parts.isNotEmpty) {
+        fName = parts.first;
+        if (parts.length > 1) {
+           lName = parts.sublist(1).join(' ');
+        }
+      }
+    }
+
     return UserModel(
-      uid: uid,
-      name: data['name'] ?? '',
-      email: data['email'] ?? '',
-      role: data['role'] ?? 'student',
-      firstName: data['firstName'],
-      lastName: data['lastName'],
-      studentNo: data['studentId'],
-      classOrder:List<String>.from(data['classOrder'] ?? []),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      uid: userId?.toString() ?? '',
+      name: name ?? '',
+      email: json['email'] ?? '',
+      role: json['role'] ?? 'student',
+      firstName: fName,
+      lastName: lName,
+      studentNo: studentNumber,
+      classOrder: (json['classOrder'] as List?)?.map((e) => e.toString()).toList() 
+          ?? (json['class_order'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      createdAt: json['createdAt'] != null 
+          ? DateTime.tryParse(json['createdAt']) 
+          : (json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null),
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
+      'uid': uid,
       'name': name,
       'email': email,
       'role': role,
       'firstName': firstName,
       'lastName': lastName,
-      'studentId': studentNo,
+      'studentNo': studentNo,
       'classOrder': classOrder,
-      // 'createdAt': FieldValue.serverTimestamp(), // Not usually sent in update
+      'createdAt': createdAt?.toIso8601String(),
     };
   }
 }

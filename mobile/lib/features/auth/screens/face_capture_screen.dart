@@ -51,7 +51,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
         orElse: () => cameras.first,
       );
       
-      _controller = CameraController(front, ResolutionPreset.medium, enableAudio: false);
+      _controller = CameraController(front, ResolutionPreset.veryHigh, enableAudio: false);
       _initializeFuture = _controller!.initialize();
       if (mounted) setState(() {});
     } catch (e) {

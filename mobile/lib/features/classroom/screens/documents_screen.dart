@@ -34,7 +34,7 @@ class DocumentsScreen extends ConsumerWidget {
             return const SkeletonListWidget(itemCount: 6);
           }
 
-          final docs = snapshot.data?.docs ?? [];
+          final docs = snapshot.data ?? [];
 
           if (docs.isEmpty) {
             return const Center(child: Text('Henüz yüklenen doküman yok.'));
@@ -43,7 +43,7 @@ class DocumentsScreen extends ConsumerWidget {
           return ListView.builder(
             itemCount: docs.length,
             itemBuilder: (context, index) {
-              final doc = docs[index].data() as Map<String, dynamic>;
+              final doc = docs[index];
               final name = doc['name'] as String;
               final url = doc['url'] as String;
               final type = doc['type'] as String?;
@@ -82,7 +82,7 @@ class DocumentsScreen extends ConsumerWidget {
 
                 if (result != null) {
                   final file = result.files.first;
-                  final user = ref.read(authStateChangesProvider).value;
+                  final user = ref.read(currentUserProvider);
 
                   if (user != null) {
                     if (context.mounted) {

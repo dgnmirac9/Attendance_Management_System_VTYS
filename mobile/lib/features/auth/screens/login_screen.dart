@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_controller.dart';
 import 'register_screen.dart';
 import '../../../core/utils/snackbar_utils.dart';
+import '../../../core/utils/validators.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +18,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -27,6 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
       try {
         await ref.read(authControllerProvider.notifier).signIn(
           email: _emailController.text.trim(),
@@ -35,34 +38,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // Navigation is handled by AuthWrapper
       } catch (e) {
         if (mounted) {
-          String message = "Giriş hatası: $e";
-          if (e.toString().contains('network')) {
-            message = "İnternet bağlantısı yok. Lütfen kontrol edin.";
-          } else if (e.toString().contains('invalid-credential')) {
-             message = "E-posta veya şifre hatalı.";
-          }
-          SnackbarUtils.showError(context, message);
+          setState(() => _isLoading = false);
+          SnackbarUtils.showError(context, e);
         }
       }
     }
   }
 
-  String? validateEmail(String? value) {
-    if (value == null || value.isEmpty) return 'E-posta gerekli';
-    if (!value.contains('@')) return 'Geçersiz e-posta';
-    return null;
-  }
 
-  String? validatePassword(String? value) {
-    if (value == null || value.isEmpty) return 'Şifre gerekli';
-    if (value.length < 6) return 'Şifre en az 6 karakter olmalı';
-    return null;
-  }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-    final isLoading = authState.isLoading;
+    final isLoading = _isLoading;
 
     return Scaffold(
       appBar: AppBar(

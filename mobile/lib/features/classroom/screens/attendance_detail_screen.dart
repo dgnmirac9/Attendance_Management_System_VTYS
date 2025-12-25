@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../providers/class_details_provider.dart';
+import '../../classroom/providers/class_details_provider.dart'; // Import for invalidation
+import '../../../core/services/attendance_service.dart'; // Added import
+import '../../auth/providers/auth_controller.dart';
 import '../widgets/student_detail_dialog.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/custom_confirm_dialog.dart';
@@ -55,7 +56,8 @@ class _AttendanceDetailScreenState extends ConsumerState<AttendanceDetailScreen>
     }
 
     try {
-      final students = await ref.read(attendanceServiceProvider).getUsersByIds(widget.attendeeUids);
+      final rawStudents = await ref.read(attendanceServiceProvider).getUsersByIds(widget.attendeeUids);
+      final students = rawStudents.map((e) => UserModel.fromJson(Map<String, dynamic>.from(e))).toList();
       if (mounted) {
         setState(() {
           _students = students;
@@ -80,11 +82,14 @@ class _AttendanceDetailScreenState extends ConsumerState<AttendanceDetailScreen>
         isDestructive: true,
         onConfirm: () async {
             try {
-              await ref.read(attendanceServiceProvider).deleteAttendanceSession(widget.classId, widget.sessionId);
-              if (mounted) {
-                Navigator.pop(context); // Close screen (using State context)
-                SnackbarUtils.showSuccess(context, "Yoklama kaydı silindi.");
-              }
+              await ref.read(attendanceServiceProvider).deleteAttendanceSession(widget.sessionId);
+                // Invalidate history provider to refresh the list on previous screen
+                ref.invalidate(classHistoryProvider(widget.classId));
+                
+                if (mounted) {
+                  Navigator.pop(context); // Close screen (using State context)
+                  SnackbarUtils.showSuccess(context, "Yoklama kaydı silindi.");
+                }
             } catch (e) {
               if (mounted) {
                 SnackbarUtils.showError(context, "Hata: $e");
@@ -102,7 +107,7 @@ class _AttendanceDetailScreenState extends ConsumerState<AttendanceDetailScreen>
 
     // STUDENT VIEW
     if (!widget.isTeacher) {
-      final currentUser = FirebaseAuth.instance.currentUser;
+      final currentUser = ref.watch(currentUserProvider); // Make sure to import providers
       final isPresent = currentUser != null && widget.attendeeUids.contains(currentUser.uid);
 
       return Scaffold(

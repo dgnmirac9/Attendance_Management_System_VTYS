@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:ui'; // For lerpDouble
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:ui';
-
 import '../providers/class_list_provider.dart';
+import '../providers/classroom_provider.dart'; // ADDED - for userClassesFutureProvider
 
 import '../../auth/providers/auth_controller.dart';
-import '../../auth/services/user_service.dart';
+
 import 'student/join_class_dialog.dart';
 import 'class_detail_screen.dart';
 
@@ -22,13 +21,34 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+  
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh class list when returning to app/screen
+      ref.invalidate(userClassesFutureProvider);
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     final sortedClassesAsync = ref.watch(sortedClassesProvider);
-    final userRoleAsync = ref.watch(userRoleProvider); // Watch user role
-    final userDataAsync = ref.watch(userDataProvider); // Watch user data
-    final user = FirebaseAuth.instance.currentUser;
+    final userRole = ref.watch(userRoleProvider); // Direct String?
+    final userData = ref.watch(userDataProvider); // Direct Map?
+    final currentUser = ref.watch(currentUserProvider); // Direct UserModel?
     final theme = Theme.of(context);
 
 
@@ -40,12 +60,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             padding: const EdgeInsets.only(right: 16.0),
             child: InkWell(
               onTap: () {
-                final userName = userDataAsync.value?['name'] ?? 'Kullanıcı';
+                final userName = userData?['name'] ?? 'Kullanıcı';
                 showModalBottomSheet(
                   context: context,
                   backgroundColor: Colors.transparent,
                   builder: (context) => ProfileMenuSheet(
-                    isTeacher: userRoleAsync.value == 'academician',
+                    isTeacher: userRole == 'instructor',
                     userName: userName,
                   ),
                 );
@@ -67,7 +87,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: sortedClassesAsync.when(
         data: (classes) {
           if (classes.isEmpty) {
-            final isTeacher = userRoleAsync.value == 'academician';
+            final isTeacher = userRole == 'instructor';
             return EmptyStateWidget(
               icon: Icons.class_outlined,
               message: isTeacher 
@@ -76,10 +96,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             );
           }
 
-          return ReorderableListView.builder(
-            padding: const EdgeInsets.all(16.0),
-            itemCount: classes.length,
-            proxyDecorator: (child, index, animation) {
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(userClassesFutureProvider);
+              // Wait for refresh to complete
+              await ref.read(userClassesFutureProvider.future);
+            },
+            child: ReorderableListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: classes.length,
+              proxyDecorator: (child, index, animation) {
               return AnimatedBuilder(
                 animation: animation,
                 builder: (BuildContext context, Widget? child) {
@@ -107,9 +133,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               classes.insert(newIndex, item);
               
               // Update order in Firestore
-              final newOrder = classes.map((c) => c.id).toList();
-              if (user != null) {
-                ref.read(userServiceProvider).updateClassOrder(user.uid, newOrder);
+
+              if (currentUser != null) {
+                // Note: Class order update not yet implemented in backend
+                // ref.read(userServiceProvider).updateClassOrder(currentUser.uid, newOrder);
               }
             },
             itemBuilder: (context, index) {
@@ -127,8 +154,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   margin: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
-                    onTap: () {
-                      Navigator.push(
+                    onTap: () async {
+                      final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => ClassDetailScreen(
@@ -138,6 +165,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                       );
+                      
+                      // If course was deleted, refresh list
+                      if (result == true) {
+                        ref.invalidate(userClassesFutureProvider);
+                      }
                     },
                     child: Container(
                       height: 120,
@@ -162,6 +194,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 ),
                               ),
                               const SizedBox(height: 4),
+                              if (classItem.semester != null && classItem.year != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4.0),
+                                  child: Text(
+                                    "${classItem.semester} ${classItem.year}",
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.grey[500],
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
                               Text(
                                 teacherName,
                                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -196,14 +239,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               );
             },
-          );
+          ),
+          ); // Close RefreshIndicator
         },
         loading: () => const SkeletonListWidget(),
         error: (e, s) => Center(child: Text('Hata: $e')),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          final isTeacher = userRoleAsync.value == 'academician';
+          final isTeacher = userRole == 'instructor';
           if (isTeacher) {
             showDialog(context: context, builder: (_) => const CreateClassDialog());
           } else {

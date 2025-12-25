@@ -2,19 +2,20 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 import '../providers/class_details_provider.dart';
-import '../providers/classroom_provider.dart';
+
+import '../../auth/providers/auth_controller.dart'; // For currentUserProvider
 
 import '../widgets/class_settings_bottom_sheet.dart';
 import '../widgets/student_detail_dialog.dart';
 import 'attendance_detail_screen.dart';
+import '../../../core/services/announcement_service.dart'; // Add import
 import '../../../core/utils/snackbar_utils.dart';
 import '../../attendance/screens/teacher_attendance_screen.dart';
-import '../../attendance/providers/attendance_provider.dart' hide classHistoryProvider;
+import '../../attendance/providers/attendance_provider.dart';
+import '../../../core/services/attendance_service.dart';
 import 'dart:io';
 import '../../attendance/screens/qr_scanner_screen.dart';
 import '../../attendance/screens/camera_screen.dart';
@@ -40,7 +41,8 @@ class ClassDetailScreen extends ConsumerStatefulWidget {
 
 class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
   int _selectedIndex = 0;
-  final String _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  // This will be initialized in build or initState using ref
+  String get _currentUid => ref.watch(currentUserProvider)?.uid ?? '';
 
   void _onItemTapped(int index) {
     setState(() {
@@ -54,13 +56,21 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     
     // Determine if user is teacher based on class data or global auth state
     // For now, let's check if the current user is the teacher of this class
-    final isTeacher = classDetailsAsync.value != null 
-        ? classDetailsAsync.value!.teacherId == _currentUid
+    final teacherId = classDetailsAsync.value?.teacherId;
+    final isTeacher = teacherId != null 
+        ? teacherId == _currentUid
         : false;
+        
+    if (classDetailsAsync.value != null) {
+       // ignore: avoid_print
+       print('DEBUG: isTeacher Check -> Class TeacherID: "$teacherId" vs Current UserID: "$_currentUid" => Result: $isTeacher');
+    }
+
 
     final teacherName = classDetailsAsync.value != null
         ? classDetailsAsync.value!.teacherName
         : 'Yükleniyor...';
+    
 
     return Scaffold(
       body: SafeArea(
@@ -136,21 +146,22 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                       ),
                       child: IconButton(
                         icon: const Icon(Icons.settings, color: Colors.white, size: 20),
-                        onPressed: () {
-                          showModalBottomSheet(
+                        onPressed: () async {
+                          final currentClassName = classDetailsAsync.value?.className ?? widget.className;
+                          final result = await showModalBottomSheet<bool>(
                             context: context,
                             isScrollControlled: true,
                             backgroundColor: Colors.transparent,
-                            builder: (context) {
-                              final currentClassName = classDetailsAsync.value?.className ?? widget.className;
-                                  
-                              return ClassSettingsBottomSheet(
-                                className: currentClassName,
-                                classId: widget.classId,
-                                isTeacher: isTeacher,
-                              );
-                            },
+                            builder: (context) => ClassSettingsBottomSheet(
+                              classId: widget.classId,
+                              className: currentClassName,
+                              isTeacher: isTeacher,
+                            ),
                           );
+                          
+                          if (result == true && context.mounted) {
+                            Navigator.of(context).pop(true);
+                          }
                         },
                       ),
                     ),
@@ -262,6 +273,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
               ),
             ),
             
+            // --- ACTIVE SESSION CARD REMOVED ---
+
+
             // --- BODY (TABS) ---
             Expanded(
               child: Builder(
@@ -307,6 +321,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     );
   }
 
+
+
   Widget? _buildTeacherFab(BuildContext context, bool isTeacher) {
     // 1. TEACHER FAB
     if (isTeacher) {
@@ -323,7 +339,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
               final sessionId = await ref.read(attendanceControllerProvider.notifier).startSession(classId: widget.classId);
               
               if (context.mounted) {
-                Navigator.push(
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => TeacherAttendanceScreen(
@@ -333,6 +349,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                     ),
                   ),
                 );
+                // Refresh history when returning from attendance screen
+                ref.invalidate(classHistoryProvider(widget.classId));
               }
             } catch (e) {
               if (context.mounted) {
@@ -347,80 +365,126 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
       return null;
     } 
     
-    // 2. STUDENT FAB (Listen to active sessions)
-    // Only show on Dashboard (index 0) or History (index 2) maybe? 
-    // Let's show it on Dashboard for visibility.
-    if (!isTeacher && _selectedIndex == 0) {
-      final activeSessionAsync = ref.watch(activeSessionProvider(widget.classId));
-      
-      return activeSessionAsync.when(
-        data: (snapshot) {
-          if (snapshot.docs.isEmpty) return null; // No active session
-          
-          final sessionDoc = snapshot.docs.first;
-          final sessionId = sessionDoc.id;
-          
-          // Check if already attended?
-          final attendanceStatusAsync = ref.watch(userAttendanceStatusProvider(
-            (classId: widget.classId, sessionId: sessionId)
-          ));
-          
-          return attendanceStatusAsync.when(
-            data: (hasAttended) {
-              if (hasAttended) return null; // Already attended
-              
-              return FloatingActionButton(
-                onPressed: () => _handleStudentJoinAttendance(context, sessionId),
-                heroTag: 'join_attendance_fab',
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                child: const Icon(Icons.qr_code_scanner),
-              );
-            },
-            loading: () => null,
-            error: (_, __) => null,
-          );
-        },
-        loading: () => null,
-        error: (_, __) => null,
-      );
-    }
-
-    return null;
+  // 2. STUDENT FAB (Listen to active sessions)
+  if (!isTeacher && _selectedIndex == 0) {
+    final activeSessionAsync = ref.watch(activeSessionProvider(widget.classId));
+    
+    return activeSessionAsync.when(
+      data: (sessionMap) {
+        if (sessionMap == null) return null; // No active session
+        
+        final sessionId = sessionMap['attendanceId'].toString();
+        
+        // Check if already attended?
+        final attendanceStatusAsync = ref.watch(userAttendanceStatusProvider(
+          (classId: widget.classId, sessionId: sessionId)
+        ));
+        
+        return attendanceStatusAsync.when(
+          data: (hasAttended) {
+            if (hasAttended) return null; // Already attended
+            
+            return FloatingActionButton(
+              onPressed: () => _handleStudentJoinAttendance(context, sessionId),
+              heroTag: 'join_attendance_fab',
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              child: const Icon(Icons.qr_code_scanner),
+            );
+          },
+          loading: () => null,
+          error: (_, __) => null,
+        );
+      },
+      loading: () => null,
+      error: (_, __) => null,
+    );
   }
 
+  return null;
+}
+
   Future<void> _handleStudentJoinAttendance(BuildContext context, String sessionId) async {
-    // 1. Scan QR Code
+    // PHASE 1: Scan and Validate QR Code
     final scannedCode = await Navigator.push<String>(
       context, 
       MaterialPageRoute(builder: (context) => const QrScannerScreen()),
     );
 
-    if (scannedCode != null && context.mounted) {
-      // 2. Open Camera for Face Verification
-      final File? capturedPhoto = await Navigator.push<File>(
-        context,
-        MaterialPageRoute(builder: (context) => const CameraScreen()),
+    if (scannedCode == null || !context.mounted) return;
+
+    // Show loading while validating QR
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // Validate QR token with backend
+      final isValid = await ref.read(attendanceServiceProvider).validateQrToken(
+        sessionId: sessionId,
+        qrToken: scannedCode,
       );
 
-      if (capturedPhoto != null && context.mounted) {
-        try {
-          // 3. Submit Attendance with QR Code and Face Photo
-          await ref.read(attendanceControllerProvider.notifier).markAttendanceWithQrAndFace(
-            classId: widget.classId,
-            sessionId: sessionId,
-            scannedCode: scannedCode,
-            photo: capturedPhoto,
-          );
-          
-          if (context.mounted) {
-            SnackbarUtils.showSuccess(context, "Yoklamaya başarıyla katıldınız!");
-          }
-        } catch (e) {
-           if (context.mounted) {
-            SnackbarUtils.showError(context, "Hata: ${e.toString().replaceAll('Exception: ', '')}");
-          }
-        }
+      if (!context.mounted) return;
+      Navigator.of(context).pop(); // Close loading
+
+      if (!isValid['valid']) {
+        // QR is invalid, show error and stop
+        SnackbarUtils.showError(
+          context, 
+          isValid['error'] ?? 'Geçersiz QR kodu'
+        );
+        return;
+      }
+
+      // PHASE 2: Face Capture with In-Camera Processing
+      if (!context.mounted) return;
+      
+      await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CameraScreen(
+            onPhotoTaken: (File photo) async {
+              // This callback runs INSIDE camera screen
+              // Loading is shown in camera, errors displayed in camera
+              try {
+                await ref.read(attendanceControllerProvider.notifier).markAttendanceWithFace(
+                  classId: widget.classId,
+                  sessionId: sessionId,
+                  photo: photo,
+                );
+                
+                // Success! Show message in camera then close
+                if (context.mounted) {
+                  SnackbarUtils.showSuccess(context, "Yoklamaya başarıyla katıldınız!");
+                }
+                return true; // Camera will close
+                
+              } catch (e) {
+                // Error! Show message in camera, stay open for retry
+                if (context.mounted) {
+                  SnackbarUtils.showError(
+                    context,
+                    e.toString().replaceAll('Exception: ', '')
+                  );
+                }
+                return false; // Camera stays open for retry
+              }
+            },
+          ),
+        ),
+      );
+      
+      // Camera closed - either success or user pressed back
+      // No action needed here, camera handled everything
+
+      
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading
+        SnackbarUtils.showError(context, "Hata: ${e.toString()}");
       }
     }
   }
@@ -430,62 +494,78 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
   Widget _buildAnnouncementsTab(BuildContext context, bool isTeacher) {
     final announcementsAsync = ref.watch(classAnnouncementsProvider(widget.classId));
 
-    return announcementsAsync.when(
-      data: (snapshot) {
-        final announcements = snapshot.docs;
-        if (announcements.isEmpty) {
-          return const EmptyStateWidget(
-            icon: Icons.campaign_outlined,
-            message: "Henüz duyuru paylaşılmamış.",
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: announcements.length,
-          itemBuilder: (context, index) {
-            final doc = announcements[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final date = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
-            final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(date);
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            data['title'] ?? 'Başlıksız',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                          ),
-                        ),
-                        if (isTeacher)
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            onPressed: () => _deleteAnnouncement(context, doc.id),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(data['content'] ?? '', style: const TextStyle(fontSize: 15)),
-                    const SizedBox(height: 12),
-                    Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  ],
+    return RefreshIndicator(
+      onRefresh: () async {
+      // Refresh both announcements and active session status
+      await Future.wait([
+        ref.refresh(classAnnouncementsProvider(widget.classId).future),
+        ref.refresh(activeSessionProvider(widget.classId).future),
+      ]);
+    },
+      child: announcementsAsync.when(
+        data: (announcements) {
+          if (announcements.isEmpty) {
+            return Stack(
+              children: [
+                const EmptyStateWidget(
+                  icon: Icons.campaign_outlined,
+                  message: "Henüz duyuru paylaşılmamış.",
                 ),
-              ),
+                ListView(), // Empty ListView to allow pull-to-refresh on empty state
+              ],
             );
-          },
-        );
-      },
-      loading: () => const SkeletonListWidget(itemCount: 3),
-      error: (e, s) => Center(child: Text('Hata: $e')),
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: announcements.length,
+            itemBuilder: (context, index) {
+              final data = announcements[index];
+              // Handle date parsing from API string or null
+              DateTime date = DateTime.now();
+              if (data['createdAt'] != null) {
+                date = DateTime.tryParse(data['createdAt']) ?? DateTime.now();
+              }
+              final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(date);
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              data['title'] ?? 'Başlıksız',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                            ),
+                          ),
+                          if (isTeacher)
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () => _deleteAnnouncement(context, data['id']?.toString() ?? ''),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(data['content'] ?? '', style: const TextStyle(fontSize: 15)),
+                      const SizedBox(height: 12),
+                      Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+        loading: () => const SkeletonListWidget(itemCount: 3),
+        error: (e, s) => Center(child: Text('Hata: $e')),
+      ),
     );
   }
 
@@ -494,83 +574,97 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     final studentsAsync = ref.watch(classStudentsProvider(widget.classId));
     final theme = Theme.of(context);
 
-    return studentsAsync.when(
-      data: (students) {
-        if (students.isEmpty) {
-          return const EmptyStateWidget(
-            icon: Icons.people_outline,
-            message: "Henüz kayıtlı öğrenci yok.",
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: students.length,
-          itemBuilder: (context, index) {
-            final student = students[index];
-            final name = student.name;
-            final studentInfo = student.studentNo ?? student.email;
+    return RefreshIndicator(
+      onRefresh: () async {
+         // Refresh both students and class details
+         await Future.wait([
+           ref.refresh(classDetailsProvider(widget.classId).future),
+           ref.refresh(classStudentsProvider(widget.classId).future),
+         ]);
+      },
+      child: studentsAsync.when(
+        data: (students) {
+          if (students.isEmpty) {
+            return Stack(
+              children: [
+                const EmptyStateWidget(
+                  icon: Icons.people_outline,
+                  message: "Henüz kayıtlı öğrenci yok.",
+                ),
+                ListView(),
+              ],
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: students.length,
+            itemBuilder: (context, index) {
+              final student = students[index];
+              final name = student.name;
+              final studentInfo = student.studentNo ?? student.email;
 
-            return Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: isTeacher ? () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => StudentDetailDialog(studentData: student),
-                  );
-                } : null,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      // Avatar
-                      CircleAvatar(
-                        backgroundColor: theme.colorScheme.primaryContainer,
-                        child: Text(
-                          name.isNotEmpty ? name[0].toUpperCase() : '?',
-                          style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: isTeacher ? () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => StudentDetailDialog(studentData: student),
+                    );
+                  } : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        // Avatar
+                        CircleAvatar(
+                          backgroundColor: theme.colorScheme.primaryContainer,
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : '?',
+                            style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      
-                      // Info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            if (studentInfo.toString().isNotEmpty)
+                        const SizedBox(width: 16),
+                        
+                        // Info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                studentInfo,
-                                style: TextStyle(color: theme.textTheme.bodyMedium?.color, fontSize: 13),
+                                name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: theme.colorScheme.primary,
+                                ),
                               ),
-                          ],
+                              if (studentInfo.toString().isNotEmpty)
+                                Text(
+                                  studentInfo,
+                                  style: TextStyle(color: theme.textTheme.bodyMedium?.color, fontSize: 13),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      
-                      // Info Icon (Teacher only)
-                      if (isTeacher)
-                        const Icon(Icons.info_outline, color: Colors.grey),
-                    ],
+                        
+                        // Info Icon (Teacher only)
+                        if (isTeacher)
+                          const Icon(Icons.info_outline, color: Colors.grey),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-      loading: () => const SkeletonListWidget(itemCount: 5),
-      error: (e, s) => Center(child: Text('Hata: $e')),
+              );
+            },
+          );
+        },
+        loading: () => const SkeletonListWidget(itemCount: 5),
+        error: (e, s) => Center(child: Text('Hata: $e')),
+      ),
     );
   }
 
@@ -578,51 +672,65 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
   Widget _buildHistoryTab(BuildContext context, bool isTeacher) {
     final historyAsync = ref.watch(classHistoryProvider(widget.classId));
 
-    return historyAsync.when(
-      data: (snapshot) {
-        final sessions = snapshot.docs;
-        if (sessions.isEmpty) {
-          return const EmptyStateWidget(
-            icon: Icons.history,
-            message: "Henüz yoklama geçmişi yok.",
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: sessions.length,
-          itemBuilder: (context, index) {
-            final doc = sessions[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final date = (data['startTime'] as Timestamp?)?.toDate() ?? DateTime.now();
-            final attendeeUids = List<String>.from(data['attendees'] ?? []);
-            
-            return _buildAttendanceCard(
-              context: context,
-              isTeacher: isTeacher,
-              date: date,
-              attendeeCount: attendeeUids.length,
-              isPresent: attendeeUids.contains(_currentUid),
-              onTap: isTeacher ? () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AttendanceDetailScreen(
-                      classCode: widget.joinCode,
-                      classId: widget.classId,
-                      sessionId: doc.id,
-                      date: date,
-                      attendeeUids: attendeeUids,
-                      isTeacher: isTeacher,
-                    ),
-                  ),
-                );
-              } : null,
-            );
-          },
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        return ref.refresh(classHistoryProvider(widget.classId).future);
       },
-      loading: () => const SkeletonListWidget(itemCount: 4),
-      error: (e, s) => Center(child: Text('Hata: $e')),
+      child: historyAsync.when(
+        data: (sessions) {
+          if (sessions.isEmpty) {
+             return Stack(
+              children: [
+                const EmptyStateWidget(
+                  icon: Icons.history,
+                  message: "Henüz yoklama geçmişi yok.",
+                ),
+                ListView(),
+              ],
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: sessions.length,
+            itemBuilder: (context, index) {
+              final data = sessions[index]; // Map
+              
+              DateTime date = DateTime.now();
+              if (data['startTime'] != null) {
+                 date = DateTime.tryParse(data['startTime']) ?? DateTime.now();
+              }
+
+              final attendeeUids = (data['attendees'] as List? ?? []).map((e) => e.toString()).toList();
+              final int totalCount = data['attendeeCount'] ?? attendeeUids.length;
+              
+              return _buildAttendanceCard(
+                context: context,
+                isTeacher: isTeacher,
+                date: date,
+                attendeeCount: totalCount,
+                isPresent: attendeeUids.contains(_currentUid),
+                onTap: isTeacher ? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AttendanceDetailScreen(
+                        classCode: widget.joinCode,
+                        classId: widget.classId,
+                        sessionId: data['attendanceId']?.toString() ?? '', // Session ID
+                        date: date,
+                        attendeeUids: attendeeUids,
+                        isTeacher: isTeacher,
+                      ),
+                    ),
+                  );
+                } : null,
+              );
+            },
+          );
+        },
+        loading: () => const SkeletonListWidget(itemCount: 4),
+        error: (e, s) => Center(child: Text('Hata: $e')),
+      ),
     );
   }
 
@@ -787,39 +895,65 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     final titleController = TextEditingController();
     final contentController = TextEditingController();
 
+    final formKey = GlobalKey<FormState>();
+
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Yeni Duyuru"),
         content: SizedBox(
           width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(labelText: "Başlık"),
-              ),
-              TextField(
-                controller: contentController,
-                decoration: const InputDecoration(labelText: "İçerik"),
-                maxLines: 3,
-              ),
-            ],
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: titleController,
+                  maxLength: 50,
+                  decoration: const InputDecoration(labelText: "Başlık", counterText: ""),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Başlık gerekli';
+                    if (val.length > 50) return 'Maksimum 50 karakter';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: contentController,
+                  decoration: const InputDecoration(labelText: "İçerik"),
+                  maxLines: 3,
+                  validator: (val) {
+                     if (val == null || val.trim().isEmpty) return 'İçerik gerekli';
+                     return null;
+                  },
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("İptal")),
           ElevatedButton(
             onPressed: () async {
-              if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
-                await ref.read(classroomServiceProvider).createAnnouncement(
-                  classId: widget.classId,
-                  title: titleController.text,
-                  content: contentController.text,
-                  teacherId: _currentUid,
-                );
-                if (context.mounted) Navigator.pop(context);
+              if (formKey.currentState!.validate()) {
+                try {
+                  await ref.read(announcementServiceProvider).createAnnouncement(
+                    widget.classId,
+                    titleController.text.trim(),
+                    contentController.text.trim(),
+                  );
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ref.invalidate(classAnnouncementsProvider(widget.classId));
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Hata: $e')),
+                    );
+                  }
+                }
               }
             },
             child: const Text("Paylaş"),
@@ -838,7 +972,16 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         confirmText: "Evet",
         cancelText: "Hayır",
         onConfirm: () async {
-          await ref.read(classroomServiceProvider).deleteAnnouncement(widget.classId, announcementId);
+          try {
+            await ref.read(announcementServiceProvider).deleteAnnouncement(announcementId);
+            ref.invalidate(classAnnouncementsProvider(widget.classId));
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Silme hatası: $e')),
+              );
+            }
+          }
         },
       ),
     );

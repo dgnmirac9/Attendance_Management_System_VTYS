@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../providers/classroom_provider.dart';
-import '../services/classroom_service.dart';
+import '../providers/class_details_provider.dart';
+import '../providers/classroom_provider.dart'; // Add this import
+
+
+import '../../../../core/services/course_service.dart';
 import '../../../../core/widgets/custom_confirm_dialog.dart';
 import '../../../../core/utils/snackbar_utils.dart';
 
@@ -21,61 +23,98 @@ class ClassSettingsBottomSheet extends ConsumerWidget {
   // --- ACTIONS ---
 
   // Rename Class
-  void _showRenameDialog(BuildContext context, WidgetRef ref) {
+  void _showRenameDialog(BuildContext context, WidgetRef parentRef) {
     final TextEditingController controller = TextEditingController(text: className);
-    final service = ref.read(classroomServiceProvider); // Capture service here
+    final service = parentRef.read(courseServiceProvider); // Capture service using parent ref (safe to read once)
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Sınıf Adını Düzenle"),
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.8,
-          child: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: "Yeni Sınıf Adı",
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("İptal"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (controller.text.trim().isEmpty) return;
-              
-              // Capture navigator/messenger
-              final navigator = Navigator.of(context);
-              
-              navigator.pop(); // Close dialog
-              
-                try {
-                // Use captured service
-                await service.updateClassName(classId, controller.text.trim());
-                
-                if (context.mounted) {
-                   SnackbarUtils.showSuccess(context, "Sınıf adı güncellendi.");
-                }
-              } catch (e) {
-                if (context.mounted) {
-                   SnackbarUtils.showError(context, "Hata: $e");
-                }
-              }
-            },
-            child: const Text("Kaydet"),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final formKey = GlobalKey<FormState>();
+         // Wrap in Consumer to get a fresh ref tied to the Dialog!
+        return Consumer(
+          builder: (context, ref, _) {
+            return AlertDialog(
+              title: const Text("Sınıf Adını Düzenle"),
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.8,
+                child: Form(
+                  key: formKey,
+                  child: TextFormField(
+                    controller: controller,
+                    maxLength: 50,
+                    decoration: const InputDecoration(
+                      labelText: "Yeni Sınıf Adı",
+                      border: OutlineInputBorder(),
+                      counterText: "",
+                    ),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Sınıf adı boş olamaz';
+                      if (val.length < 3) return 'En az 3 karakter olmalı';
+                      if (val.length > 50) return 'Maksimum 50 karakter';
+                      return null;
+                    },
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("İptal"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (!formKey.currentState!.validate()) return;
+                    if (controller.text.trim() == className) {
+                      Navigator.pop(context);
+                      SnackbarUtils.showInfo(context, "Değişiklik yapılmadı.");
+                      return;
+                    }
+                    
+                    final navigator = Navigator.of(context); // Restore definition
+                    
+                    try {
+                      await service.updateCourseName(classId, controller.text.trim());
+                      
+                      if (context.mounted) {
+                         // Invalidate provider to refresh UI while ref is still valid
+                         ref.invalidate(classDetailsProvider(classId));
+                         ref.invalidate(userClassesFutureProvider); // Refresh home screen (source of truth)
+                         // ref.invalidate(sortedClassesProvider); // This will auto-update if userClasses updates
+                         SnackbarUtils.showSuccess(context, "Sınıf adı güncellendi.");
+                      }
+                      
+                      navigator.pop(); // Close dialog AFTER using ref
+                      
+                    } catch (e) {
+                      // Show error while dialog is still mounted
+                      if (context.mounted) {
+                         SnackbarUtils.showError(context, e);
+                      }
+                      // THEN close dialog - don't pop before showing error
+                      // Actually, let's keep dialog open on error so user can fix and retry
+                      // navigator.pop(); // Removed - keep dialog open on error
+                    }
+                  },
+                  child: const Text("Kaydet"),
+                ),
+              ],
+            );
+          }
+        );
+      },
     );
   }
 
   // Confirm Delete / Leave
-  void _confirmDelete(BuildContext context, ClassroomService service) {
-    final String currentUid = FirebaseAuth.instance.currentUser!.uid;
+  void _confirmDelete(BuildContext context, CourseService service, WidgetRef ref) {
+    // Use the provider for current user ID to avoid Firebase dependency
+    // Note: Since this is inside a callback, strictly we should use ref.read if outside build, 
+    // but we can just use the ID if we pass it or read safely.
+    // However, since we are in a method, we can't easily use ref unless we pass it.
+    // Updated signature of _confirmDelete to accept ref or userId.
+    // For now, let's assume valid user if logged in.
+
 
     showDialog(
       context: context,
@@ -92,22 +131,17 @@ class ClassSettingsBottomSheet extends ConsumerWidget {
 
             try {
               if (isTeacher) {
-                await service.deleteClass(classId);
+                await service.deleteCourse(classId);
               } else {
-                await service.leaveClass(classId, currentUid);
+                await service.leaveCourse(classId);
               }
               
-              navigator.pop(); // Close bottom sheet
+              // Close bottom sheet and return true to indicate deletion
+              navigator.pop(true);
               
-              if (context.mounted) {
-                 SnackbarUtils.showSuccess(context, isTeacher ? "Sınıf silindi." : "Sınıftan ayrıldınız.");
-              }
-              
-              // Return to Home (Pop until first route)
-              navigator.popUntil((route) => route.isFirst);
             } catch (e) {
               if (context.mounted) {
-                 SnackbarUtils.showError(context, "Hata: $e");
+                 SnackbarUtils.showError(context, e);
               }
             }
         },
@@ -170,9 +204,9 @@ class ClassSettingsBottomSheet extends ConsumerWidget {
             iconColor: errorColor,
             textColor: errorColor,
             onTap: () {
-              final service = ref.read(classroomServiceProvider);
+              final service = ref.read(courseServiceProvider);
               Navigator.pop(context);
-              _confirmDelete(context, service);
+              _confirmDelete(context, service, ref);
             },
           ),
           

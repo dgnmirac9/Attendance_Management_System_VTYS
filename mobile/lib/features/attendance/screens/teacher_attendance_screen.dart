@@ -3,7 +3,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import '../../../core/utils/snackbar_utils.dart'; // Assuming this exists or using ScaffoldMessenger directly if not
+import '../../../core/utils/snackbar_utils.dart';
+import '../../../core/services/attendance_service.dart';
 import '../providers/attendance_provider.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/custom_confirm_dialog.dart';
@@ -28,41 +29,50 @@ class TeacherAttendanceScreen extends ConsumerStatefulWidget {
 class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScreen> {
   String _currentQrData = "Loading...";
   Timer? _qrTimer;
+  Timer? _pollingTimer;
   
-
   @override
   void initState() {
     super.initState();
-    // İlk QR kodunu üret ve timer başlat
-    _updateQrCode();
+    _generateNewQrCode();
+    
     _qrTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      _updateQrCode();
+      if (!mounted) return;
+      _generateNewQrCode();
+      _pollAttendanceList();
     });
   }
 
   @override
   void dispose() {
     _qrTimer?.cancel();
+    _pollingTimer?.cancel();
     super.dispose();
   }
 
-  void _updateQrCode() {
-    // Rastgele benzersiz bir kod üret
+  void _generateNewQrCode() {
+    if (!mounted) return;
+
     final random = Random();
     final newCode = "${widget.classId}-${DateTime.now().millisecondsSinceEpoch}-${random.nextInt(1000)}";
 
-    if (mounted) {
-      setState(() {
-        _currentQrData = newCode;
-      });
-    }
+    setState(() {
+      _currentQrData = newCode;
+    });
 
-    // Servis üzerinden Firestore'u güncelle
-    ref.read(attendanceServiceProvider).updateSessionQrCode(
-      classId: widget.classId, 
-      sessionId: widget.sessionId, 
-      qrCode: newCode
-    );
+    try {
+      ref.read(attendanceServiceProvider).updateSessionQrCode(
+        widget.sessionId, 
+        newCode
+      );
+    } catch (e) {
+      debugPrint("QR Update Failed: $e");
+    }
+  }
+
+  void _pollAttendanceList() {
+    if (!mounted) return;
+    ref.invalidate(sessionAttendanceProvider(widget.sessionId));
   }
 
   void _endSession() async {
@@ -72,7 +82,7 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
         sessionId: widget.sessionId
       );
       if (mounted) {
-        Navigator.pop(context); // Ekranı kapat
+        Navigator.pop(context);
         SnackbarUtils.showSuccess(context, "Yoklama oturumu sonlandırıldı.");
       }
     } catch (e) {
@@ -101,9 +111,8 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    // Canlı katılımcıları izle
     final sessionAttendanceAsync = ref.watch(
-      sessionAttendanceProvider((classId: widget.classId, sessionId: widget.sessionId)),
+      sessionAttendanceProvider(widget.sessionId),
     );
 
     return Scaffold(
@@ -139,7 +148,6 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
           ),
           const SizedBox(height: 30),
           
-          // QR KOD ALANI
           Center(
             child: Container(
               padding: const EdgeInsets.all(20),
@@ -165,14 +173,11 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
           
           const SizedBox(height: 40),
           
-          // KATILIMCI LİSTESİ PANELİ
           sessionAttendanceAsync.when(
-            data: (snapshot) {
-              final records = snapshot.docs;
+            data: (records) {
               return Expanded(
                 child: Column(
                   children: [
-                    // Başlık ve Sayı
                      Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: Row(
@@ -200,7 +205,6 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
                       ),
                     ),
                     const SizedBox(height: 10),
-                    // Liste
                     Expanded(
                       child: records.isEmpty
                           ? const EmptyStateWidget(
@@ -211,9 +215,9 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               itemCount: records.length,
                               itemBuilder: (context, index) {
-                                final record = records[index].data() as Map<String, dynamic>;
-                                final name = record['name'] ?? record['studentId'] ?? "Öğrenci";
-                                final studentId = record['studentId'] ?? "";
+                                final record = records[index];
+                                final name = record['student_name'] ?? record['name'] ?? "Öğrenci";
+                                final studentId = record['student_number'] ?? record['student_id']?.toString() ?? "";
                                 
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
@@ -234,8 +238,8 @@ class _TeacherAttendanceScreenState extends ConsumerState<TeacherAttendanceScree
                 ),
               );
             },
-            loading: () => const SkeletonListWidget(itemCount: 4),
-            error: (e, s) => Center(child: Text("Hata: $e")),
+            loading: () => const Expanded(child: SkeletonListWidget(itemCount: 4)),
+            error: (e, s) => Expanded(child: Center(child: Text("Hata: $e"))),
           ),
         ],
       ),

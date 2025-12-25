@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/utils/snackbar_utils.dart';
 
 import '../providers/classroom_provider.dart';
-import '../../auth/services/user_service.dart';
+import '../../auth/providers/auth_controller.dart';
 
 class CreateClassDialog extends ConsumerStatefulWidget {
   const CreateClassDialog({super.key});
@@ -16,6 +15,8 @@ class CreateClassDialog extends ConsumerStatefulWidget {
 class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _classNameController = TextEditingController();
+  String? _selectedSemester;
+  final List<String> _semesters = ['Güz', 'Bahar', 'Yaz'];
   bool _isLoading = false;
 
   @override
@@ -30,31 +31,12 @@ class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = ref.read(currentUserProvider);
       if (user == null) throw Exception("Kullanıcı oturumu bulunamadı");
 
-      // Fetch teacher's name from Firestore profile
-      String teacherName = "Öğretim Görevlisi";
-      try {
-        final userDoc = await ref.read(userServiceProvider).getUserStream(user.uid).first;
-        if (userDoc.exists) {
-          final data = userDoc.data() as Map<String, dynamic>;
-          if (data.containsKey('name') && data['name'].toString().isNotEmpty) {
-             teacherName = data['name'];
-          } else if (data.containsKey('firstName') || data.containsKey('lastName')) {
-             teacherName = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
-          }
-        }
-      } catch (e) {
-        debugPrint("Error fetching teacher name: $e");
-      }
-      
-      if (teacherName.isEmpty) teacherName = user.displayName ?? user.email ?? "Öğretim Görevlisi";
-
-      await ref.read(classroomServiceProvider).createClass(
-        className: _classNameController.text.trim(),
-        teacherId: user.uid,
-        teacherName: teacherName,
+      await ref.read(classroomControllerProvider.notifier).createClass(
+        courseName: _classNameController.text.trim(),
+        semester: _selectedSemester!,
       );
 
       if (mounted) {
@@ -99,6 +81,12 @@ class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Sınıf adı boş olamaz';
                     }
+                    if (value.trim().length < 3) {
+                      return 'Sınıf adı en az 3 karakter olmalıdır';
+                    }
+                    if (value.trim().length > 50) {
+                      return 'Sınıf adı 50 karakterden uzun olamaz';
+                    }
                     return null;
                   },
                   decoration: InputDecoration(
@@ -120,6 +108,31 @@ class _CreateClassDialogState extends ConsumerState<CreateClassDialog> {
                       borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedSemester,
+                  validator: (value) => value == null ? 'Dönem seçiniz' : null,
+                  onChanged: (value) => setState(() => _selectedSemester = value),
+                  decoration: InputDecoration(
+                    labelText: 'Dönem',
+                    prefixIcon: const Icon(Icons.calendar_month),
+                    filled: true,
+                    fillColor: theme.colorScheme.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: theme.dividerColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: theme.dividerColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+                    ),
+                  ),
+                  items: _semesters.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                 ),
                 const SizedBox(height: 24),
                 Row(

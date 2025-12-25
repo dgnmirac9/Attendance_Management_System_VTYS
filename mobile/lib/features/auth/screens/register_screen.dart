@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_controller.dart';
 import 'face_capture_screen.dart';
 import '../../../core/utils/snackbar_utils.dart';
+import '../../../core/utils/validators.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -28,8 +29,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePassword = true; 
   bool _obscureConfirmPassword = true; 
   
-  // Face Data (Placeholder)
-  // List<List<double>> _faceEmbeddings = []; 
+  // Face Data
+  String? _faceImagePath;
 
   @override
   void dispose() {
@@ -50,9 +51,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       MaterialPageRoute(builder: (context) => const FaceCaptureScreen()),
     );
 
-    if (result != null) {
+    if (result != null && result is List<String> && result.isNotEmpty) {
+      setState(() {
+        _faceImagePath = result.first;
+      });
       if (mounted) {
-         SnackbarUtils.showSuccess(context, "Yüz verisi alındı (Simüle).");
+         SnackbarUtils.showSuccess(context, "Yüz verisi alındı.");
       }
     }
   }
@@ -60,15 +64,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   // --- REGISTER FUNCTION ---
   void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
+      if (_isStudent && _faceImagePath == null) {
+        SnackbarUtils.showError(context, "Lütfen yüz verisi ekleyin.");
+        return;
+      }
+
       try {
         await ref.read(authControllerProvider.notifier).signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
-          role: _isStudent ? 'student' : 'academician',
+          role: _isStudent ? 'student' : 'instructor',
           firstName: _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim(),
           studentNo: _isStudent ? _studentNoController.text.trim() : null,
-          // faceEmbeddings: _isStudent ? _faceEmbeddings : null, 
+          faceImagePath: _faceImagePath,
         );
         
         if (mounted) {
@@ -77,30 +86,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         }
       } catch (e) {
         if (mounted) {
-          SnackbarUtils.showError(context, 'Kayıt hatası: $e');
+          SnackbarUtils.showError(context, e);
         }
       }
     }
   }
 
-  String? validateRequired(String? value, {required String fieldName}) {
-    if (value == null || value.trim().isEmpty) {
-      return '$fieldName gerekli';
-    }
-    return null;
-  }
 
-  String? validateEmail(String? value) {
-    if (value == null || value.isEmpty) return 'E-posta gerekli';
-    if (!value.contains('@')) return 'Geçersiz e-posta';
-    return null;
-  }
-
-  String? validatePassword(String? value) {
-    if (value == null || value.isEmpty) return 'Şifre gerekli';
-    if (value.length < 6) return 'Şifre en az 6 karakter olmalı';
-    return null;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -245,18 +237,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             prefixIcon: Icon(Icons.badge),
                             counterText: "",
                           ),
-                          validator: (val) {
-                             if (val == null || val.isEmpty) return 'Zorunlu';
-                             if (val.length != 9) return '9 haneli olmalı';
-                             return null;
-                          },
+                          validator: validateStudentNumber,
                         ),
                         
                         const SizedBox(height: 16),
                         OutlinedButton.icon(
                           onPressed: _captureFaceData, 
-                          icon: const Icon(Icons.face),
-                          label: const Text('Yüz Verisi Ekle'), 
+                          icon: Icon(_faceImagePath != null ? Icons.check_circle : Icons.face),
+                          label: Text(_faceImagePath != null ? 'Yüz Verisi Alındı (Güncelle)' : 'Yüz Verisi Ekle'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _faceImagePath != null ? Colors.green : null,
+                            side: _faceImagePath != null ? const BorderSide(color: Colors.green) : null,
+                          ),
                         ),
                       ],
 
